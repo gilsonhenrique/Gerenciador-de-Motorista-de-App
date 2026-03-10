@@ -1,0 +1,5 @@
+{
+  "name": "Gerenciador de Motorista",
+  "description": "Painel completo para motoristas de aplicativo acompanharem ganhos da Uber, 99, gastos com combustível, aluguel e relatórios mensais.",
+  "requestFramePermissions": []
+}
