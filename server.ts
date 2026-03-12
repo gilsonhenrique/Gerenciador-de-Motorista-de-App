@@ -1,130 +1,120 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import { PrismaClient } from "@prisma/client";
 import cors from "cors";
+import path from "path";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
-const app = express();
-const PORT = 3000;
 
-app.use(express.json());
-app.use(cors());
+async function startServer() {
+  const app = express();
+  const PORT = 3000;
 
-// API Routes
-app.get("/api/transactions", async (req, res) => {
-  try {
-    const transactions = await prisma.transaction.findMany({
-      orderBy: { date: 'desc' }
-    });
-    res.json(transactions);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch transactions" });
-  }
-});
+  app.use(express.json({ limit: '50mb' }));
+  app.use(cors());
 
-app.post("/api/transactions", async (req, res) => {
-  const { type, amount, description, date, weekStart, weekEnd } = req.body;
-  try {
-    const transaction = await prisma.transaction.create({
-      data: {
-        type,
-        amount: parseFloat(amount),
-        description,
-        date: date ? new Date(date) : new Date(),
-        weekStart: weekStart ? new Date(weekStart) : null,
-        weekEnd: weekEnd ? new Date(weekEnd) : null
-      }
-    });
-    res.json(transaction);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to create transaction" });
-  }
-});
+  // API Routes
+  app.get("/api/data", async (req, res) => {
+    try {
+      const [transactions, reports, settings] = await Promise.all([
+        prisma.transaction.findMany({
+          orderBy: { date: 'desc' }
+        }),
+        prisma.report.findMany({
+          orderBy: { createdAt: 'desc' }
+        }),
+        prisma.settings.findUnique({ where: { id: "default" } })
+      ]);
 
-app.put("/api/transactions/:id", async (req, res) => {
-  const { id } = req.params;
-  const { type, amount, description, date, weekStart, weekEnd } = req.body;
-  try {
-    const transaction = await prisma.transaction.update({
-      where: { id },
-      data: {
-        type,
-        amount: parseFloat(amount),
-        description,
-        date: date ? new Date(date) : undefined,
-        weekStart: weekStart ? new Date(weekStart) : null,
-        weekEnd: weekEnd ? new Date(weekEnd) : null
-      }
-    });
-    res.json(transaction);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update transaction" });
-  }
-});
+      const data = {
+        transactions,
+        reports,
+        settings: settings || {
+          id: "default",
+          cycleStartDay: 24,
+          cycleDuration: 30,
+          referenceDate: new Date('2025-06-24T00:00:00Z')
+        }
+      };
 
-app.delete("/api/transactions/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    await prisma.transaction.delete({
-      where: { id }
-    });
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to delete transaction" });
-  }
-});
-
-// Report Routes
-app.get("/api/reports", async (req, res) => {
-  try {
-    const reports = await prisma.report.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
-    res.json(reports);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch reports" });
-  }
-});
-
-app.post("/api/reports", async (req, res) => {
-  const { name, startDate, endDate } = req.body;
-  try {
-    const report = await prisma.report.create({
-      data: {
-        name,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate)
-      }
-    });
-    res.json(report);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to create report" });
-  }
-});
-
-app.delete("/api/reports/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    await prisma.report.delete({
-      where: { id }
-    });
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to delete report" });
-  }
-});
-
-// Vite middleware for development
-if (process.env.NODE_ENV !== "production") {
-  const vite = await createViteServer({
-    server: { middlewareMode: true },
-    appType: "spa",
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      res.status(500).json({ error: "Failed to fetch data" });
+    }
   });
-  app.use(vite.middlewares);
-} else {
-  app.use(express.static("dist"));
+
+  app.post("/api/sync", async (req, res) => {
+    try {
+      const { transactions, reports, settings } = req.body;
+
+      await prisma.$transaction([
+        prisma.transaction.deleteMany(),
+        prisma.report.deleteMany(),
+        
+        prisma.transaction.createMany({
+          data: transactions.map((t: any) => ({
+            id: t.id,
+            type: t.type,
+            amount: t.amount,
+            date: new Date(t.date),
+            description: t.description || "",
+            weekStart: t.weekStart ? new Date(t.weekStart) : null,
+            weekEnd: t.weekEnd ? new Date(t.weekEnd) : null
+          }))
+        }),
+        prisma.report.createMany({
+          data: reports.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            startDate: new Date(r.startDate),
+            endDate: new Date(r.endDate),
+            createdAt: new Date(r.createdAt)
+          }))
+        }),
+        prisma.settings.upsert({
+          where: { id: "default" },
+          update: {
+            cycleStartDay: settings.cycleStartDay,
+            cycleDuration: settings.cycleDuration,
+            referenceDate: new Date(settings.referenceDate)
+          },
+          create: {
+            id: "default",
+            cycleStartDay: settings.cycleStartDay,
+            cycleDuration: settings.cycleDuration,
+            referenceDate: new Date(settings.referenceDate)
+          }
+        })
+      ]);
+
+      res.json({ success: true, path: "SQLite (Prisma)" });
+    } catch (error) {
+      console.error("Sync error:", error);
+      res.status(500).json({ error: "Failed to sync data" });
+    }
+  });
+
+  // Vite middleware for development
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    app.use(express.static("dist"));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(process.cwd(), "dist", "index.html"));
+    });
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log("NODE_ENV:", process.env.NODE_ENV);
+  });
 }
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+startServer().catch(err => {
+  console.error("Failed to start server:", err);
 });

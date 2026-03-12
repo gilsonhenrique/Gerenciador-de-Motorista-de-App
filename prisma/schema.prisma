@@ -27,3 +27,10 @@ model Report {
   endDate   DateTime
   createdAt DateTime @default(now())
 }
+
+model Settings {
+  id             String   @id @default("default")
+  cycleStartDay  Int      @default(1)
+  cycleDuration  Int      @default(30) // days
+  referenceDate  DateTime @default(now())
+}
