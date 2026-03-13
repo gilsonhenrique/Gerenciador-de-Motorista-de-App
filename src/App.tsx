@@ -23,6 +23,8 @@ import {
   Calendar,
   Download,
   Settings,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
@@ -203,66 +205,88 @@ export default function App() {
     }
     
     if (settings && settings.cycleStartDay !== 1) {
-      // Use custom cycle logic
-      const { start, end } = getCycleRange(new Date(), settings);
-      // For simplicity, if we are in "month view", we show the current cycle
-      // But if the user clicks prev/next month, it gets tricky.
-      // Let's adjust the logic: if settings are active, we show cycles instead of calendar months.
-      
-      // Calculate cycle for the "selected" period
-      // If we are using calendar months, we might want to stick to it unless explicitly in "Cycle Mode"
-      // But the user asked for this cycle. Let's make it the default view.
-      
-      // To support prev/next cycle:
       const baseDate = new Date(selectedYear, selectedMonth, 15);
       const { start: cycleStart, end: cycleEnd } = getCycleRange(baseDate, settings);
       
-      return tDate >= cycleStart && tDate <= new Date(cycleEnd.getTime() + 86400000);
+      // Strict comparison: start of cycle (00:00:00) to end of cycle (23:59:59)
+      const s = new Date(cycleStart);
+      s.setUTCHours(0, 0, 0, 0);
+      const e = new Date(cycleEnd);
+      e.setUTCHours(23, 59, 59, 999);
+      
+      return tDate >= s && tDate <= e;
     }
 
     return tDate.getUTCMonth() === selectedMonth && tDate.getUTCFullYear() === selectedYear;
   });
 
   const groupedTransactions = useMemo(() => {
-    const groups: { [key: string]: { label: string, transactions: Transaction[] } } = {};
+    const groups: { [key: number]: { label: string, transactions: Transaction[] } } = {};
     
+    let cycleStart: Date | null = null;
+    if (settings && settings.cycleStartDay !== 1 && !customRange) {
+      const baseDate = new Date(selectedYear, selectedMonth, 15);
+      const range = getCycleRange(baseDate, settings);
+      cycleStart = range.start;
+    }
+
     filteredTransactions.forEach(t => {
-      let weekStart: Date;
-      let weekEnd: Date;
-      
-      if (t.weekStart && t.weekEnd) {
-        weekStart = new Date(t.weekStart);
-        weekEnd = new Date(t.weekEnd);
+      let weekIndex: number;
+      let label: string;
+
+      if (cycleStart) {
+        const tDate = new Date(t.date);
+        tDate.setUTCHours(0,0,0,0);
+        const diff = tDate.getTime() - cycleStart.getTime();
+        weekIndex = Math.floor(diff / (7 * 24 * 60 * 60 * 1000));
+        
+        const wStart = new Date(cycleStart);
+        wStart.setUTCDate(cycleStart.getUTCDate() + (weekIndex * 7));
+        const wEnd = new Date(wStart);
+        wEnd.setUTCDate(wStart.getUTCDate() + 6);
+        
+        label = `Semana ${weekIndex + 1}`;
       } else {
         const d = new Date(t.date);
         const day = d.getUTCDay();
         const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
-        weekStart = new Date(d);
-        weekStart.setUTCDate(diff);
-        weekStart.setUTCHours(0,0,0,0);
+        const ws = new Date(d);
+        ws.setUTCDate(diff);
+        ws.setUTCHours(0,0,0,0);
         
-        weekEnd = new Date(weekStart);
-        weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
-        weekEnd.setUTCHours(23,59,59,999);
+        weekIndex = ws.getTime();
+        label = `Semana de ${ws.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`;
       }
       
-      const key = weekStart.toISOString().split('T')[0];
-      const label = `${weekStart.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} - ${weekEnd.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`;
-      
-      if (!groups[key]) {
-        groups[key] = { label, transactions: [] };
+      if (!groups[weekIndex]) {
+        groups[weekIndex] = { label, transactions: [] };
       }
-      groups[key].transactions.push(t);
+      groups[weekIndex].transactions.push(t);
     });
     
+    const typeOrder: Record<string, number> = {
+      'uber': 1,
+      '99': 2,
+      'gorjeta': 3,
+      'entrada': 4,
+      'combustivel': 5,
+      'aluguel': 6
+    };
+
     return Object.keys(groups)
-      .sort((a, b) => b.localeCompare(a))
-      .map(key => ({
-        weekKey: key,
-        weekLabel: groups[key].label,
-        transactions: groups[key].transactions.sort((a, b) => b.date.getTime() - a.date.getTime())
+      .map(Number)
+      .sort((a, b) => b - a)
+      .map(index => ({
+        weekKey: index.toString(),
+        weekLabel: groups[index].label,
+        transactions: groups[index].transactions.sort((a, b) => {
+          const orderA = typeOrder[a.type] || 99;
+          const orderB = typeOrder[b.type] || 99;
+          if (orderA !== orderB) return orderA - orderB;
+          return b.amount - a.amount; // Sort by amount if same type
+        })
       }));
-  }, [filteredTransactions]);
+  }, [filteredTransactions, settings, selectedMonth, selectedYear, customRange]);
 
   const totalIncome = filteredTransactions
     .filter(t => ['uber', '99', 'gorjeta', 'entrada'].includes(t.type))
@@ -375,7 +399,6 @@ export default function App() {
 
     // Table
     const tableData = reportTransactions.map(t => [
-      t.date.toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
       getLabel(t.type),
       t.weekStart && t.weekEnd 
         ? `${t.description} (${t.weekStart.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} - ${t.weekEnd.toLocaleDateString('pt-BR', { timeZone: 'UTC' })})`
@@ -385,7 +408,7 @@ export default function App() {
 
     autoTable(doc, {
       startY: 85,
-      head: [['Data', 'Tipo', 'Descrição', 'Valor']],
+      head: [['Tipo', 'Descrição', 'Valor']],
       body: tableData,
       headStyles: { fillColor: [40, 40, 40] },
       alternateRowStyles: { fillColor: [250, 250, 250] },
@@ -710,9 +733,19 @@ export default function App() {
 
       <main className="max-w-md mx-auto px-6 mt-8">
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-red-600">
-            <X className="w-5 h-5 flex-shrink-0" />
-            <p className="text-sm font-medium">{error}</p>
+          <div className="mb-6 p-6 bg-red-50 border border-red-100 rounded-3xl text-center">
+            <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-6 h-6 text-red-600" />
+            </div>
+            <h3 className="text-red-900 font-bold mb-1">Erro de Conexão</h3>
+            <p className="text-red-600/70 text-xs mb-4">{error}</p>
+            <button 
+              onClick={() => fetchAllData()}
+              className="w-full py-3 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+              Tentar Novamente
+            </button>
           </div>
         )}
 
@@ -813,7 +846,7 @@ export default function App() {
                   <div className="flex items-center gap-2 px-1">
                     <Calendar className="w-3 h-3 text-zinc-400" />
                     <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                      Semana: {group.weekLabel}
+                      {group.weekLabel}
                     </h3>
                   </div>
                   <div className="space-y-3">
@@ -830,9 +863,11 @@ export default function App() {
                           </div>
                           <div>
                             <h3 className="font-semibold text-sm">{t.description}</h3>
-                            <p className="text-xs text-zinc-400">
-                              {t.date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
-                            </p>
+                            {t.weekStart && t.weekEnd && (
+                              <p className="text-[10px] text-zinc-400 font-medium">
+                                {t.weekStart.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} a {t.weekEnd.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-4">

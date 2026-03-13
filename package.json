@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
+    "setup": "prisma migrate deploy && prisma generate",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
