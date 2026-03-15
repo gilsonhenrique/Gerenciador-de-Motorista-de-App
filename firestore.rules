@@ -1,0 +1,106 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}/transactions
+    // Fields:
+    //   - userId: string (required, must match owner)
+    //   - type: string (required, enum: uber, 99, combustivel, gorjeta, entrada, aluguel)
+    //   - amount: number (required)
+    //   - date: timestamp (required)
+    //   - description: string
+    //   - weekStart: timestamp
+    //   - weekEnd: timestamp
+    //
+    // Collection: /users/{userId}/reports
+    // Fields:
+    //   - userId: string (required)
+    //   - name: string (required)
+    //   - startDate: timestamp (required)
+    //   - endDate: timestamp (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: /users/{userId}/settings
+    // Fields:
+    //   - userId: string (required)
+    //   - cycleStartDay: int (required)
+    //   - cycleDuration: int (required)
+    //   - referenceDate: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "gilsonhenrique68.gh@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidTransaction(data) {
+      return data.userId == request.auth.uid &&
+             data.type in ['uber', '99', 'combustivel', 'gorjeta', 'entrada', 'aluguel'] &&
+             data.amount is number && data.amount >= 0 &&
+             data.date is timestamp &&
+             (!('description' in data) || (data.description is string && data.description.size() < 500)) &&
+             (!('weekStart' in data) || data.weekStart is timestamp || data.weekStart == null) &&
+             (!('weekEnd' in data) || data.weekEnd is timestamp || data.weekEnd == null);
+    }
+
+    function isValidReport(data) {
+      return data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.startDate is timestamp &&
+             data.endDate is timestamp &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidSettings(data) {
+      return data.userId == request.auth.uid &&
+             data.cycleStartDay is int && data.cycleStartDay >= 1 && data.cycleStartDay <= 31 &&
+             data.cycleDuration is int && data.cycleDuration > 0 &&
+             data.referenceDate is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      
+      match /transactions/{transactionId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTransaction(request.resource.data);
+        allow update: if isOwner(userId) && isValidTransaction(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /reports/{reportId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidReport(request.resource.data);
+        allow update: if isOwner(userId) && isValidReport(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /settings/{settingId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidSettings(request.resource.data);
+        allow update: if isOwner(userId) && isValidSettings(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

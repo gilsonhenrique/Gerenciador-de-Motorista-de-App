@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A financial transaction for the driver (income or expense)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string", "description": "The UID of the user who owns this transaction" },
+        "type": { "type": "string", "enum": ["uber", "99", "combustivel", "gorjeta", "entrada", "aluguel"] },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" },
+        "weekStart": { "type": "string", "format": "date-time" },
+        "weekEnd": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "amount", "date"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "A saved financial report for a specific period",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "startDate", "endDate", "createdAt"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "User preferences and cycle configurations",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "cycleStartDay": { "type": "integer" },
+        "cycleDuration": { "type": "integer" },
+        "referenceDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "cycleStartDay", "cycleDuration", "referenceDate"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Collection of user transactions"
+    },
+    "/users/{userId}/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Collection of user reports"
+    },
+    "/users/{userId}/settings/default": {
+      "schema": "Settings",
+      "description": "User settings document"
+    }
+  }
+}
