@@ -1,20 +1,9 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Finanças Driver
 
-# Run and deploy your AI Studio app
+O seu aplicativo de Finanças Driver agora está com um fluxo de trabalho profissional:
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/d5c2f2be-b95c-4e5a-8bb3-11a1b2fe2ce4
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- **Visão Geral Anual:** Para acompanhar seu desempenho ao longo de todo o ano.
+- **Ciclos Manuais:** Flexibilidade total para definir seus períodos de fechamento.
+- **Exportação PDF/CSV:** Facilidade para baixar e analisar seus dados.
+- **Layout Responsivo:** Tudo organizado e fácil de usar no celular.
+- **Datas Precisas:** Sem erros de fuso horário nos seus registros.

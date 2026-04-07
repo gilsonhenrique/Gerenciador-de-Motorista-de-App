@@ -169,6 +169,11 @@ function Login() {
 
 // --- Main App Component ---
 
+const parseUTCDate = (dateStr: string) => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+};
+
 function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -198,8 +203,8 @@ function AppContent() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   
   const [customRange, setCustomRange] = useState<{ start: string; end: string }>({
-    start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    end: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]
+    start: `${new Date().getFullYear()}-01-01`,
+    end: `${new Date().getFullYear()}-12-31`
   });
   const [isCycleModalOpen, setIsCycleModalOpen] = useState(false);
   const [reportName, setReportName] = useState('');
@@ -346,8 +351,8 @@ function AppContent() {
       await addDoc(collection(db, `users/${user.uid}/reports`), {
         userId: user.uid,
         name: reportName,
-        startDate: Timestamp.fromDate(new Date(customRange.start)),
-        endDate: Timestamp.fromDate(new Date(customRange.end)),
+        startDate: Timestamp.fromDate(parseUTCDate(customRange.start)),
+        endDate: Timestamp.fromDate(parseUTCDate(customRange.end)),
         createdAt: serverTimestamp()
       });
       setIsReportModalOpen(false);
@@ -386,32 +391,17 @@ function AppContent() {
   };
 
   const clearFilter = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const todayStr = `${year}-${month}-${day}`;
-
-    const currentCycle = reports.find(r => {
-      const startStr = r.startDate.getUTCFullYear() + '-' + String(r.startDate.getUTCMonth() + 1).padStart(2, '0') + '-' + String(r.startDate.getUTCDate()).padStart(2, '0');
-      const endStr = r.endDate.getUTCFullYear() + '-' + String(r.endDate.getUTCMonth() + 1).padStart(2, '0') + '-' + String(r.endDate.getUTCDate()).padStart(2, '0');
-      return todayStr >= startStr && todayStr <= endStr;
+    setActiveReportId(null);
+    const start = `${selectedYear}-01-01`;
+    const end = `${selectedYear}-12-31`;
+    setCustomRange({
+      start,
+      end
     });
-
-    if (currentCycle) {
-      selectReport(currentCycle);
-    } else {
-      setActiveReportId(null);
-      const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      setCustomRange({
-        start: start.getFullYear() + '-' + String(start.getMonth() + 1).padStart(2, '0') + '-' + String(start.getDate()).padStart(2, '0'),
-        end: end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0')
-      });
-    }
   };
 
-  // Auto-select current cycle on load
+  // Auto-select current cycle on load (Optional: keeping it but making sure it doesn't override yearly intent if that's what user wants)
+  // Actually, the user asked for "Visão Geral" to be the year, so we'll keep the auto-select for convenience but the "Visão Geral" card will always go to the year.
   useEffect(() => {
     if (reports.length > 0 && !activeReportId) {
       const now = new Date();
@@ -431,61 +421,6 @@ function AppContent() {
       }
     }
   }, [reports]);
-
-  const generateStandardCycles = async () => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    try {
-      const reportsRef = collection(db, `users/${user.uid}/reports`);
-      const snapshot = await getDocs(reportsRef);
-      
-      // Identify standard cycles to replace them with corrected dates
-      const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-      const standardCycleNames: string[] = [];
-      for (let y of [2025, 2026]) {
-        for (let m of monthNames) {
-          standardCycleNames.push(`${m}/${y}`);
-        }
-      }
-
-      // Delete existing standard cycles to ensure clean state with new dates
-      const toDelete = snapshot.docs.filter(doc => standardCycleNames.includes(doc.data().name));
-      for (const d of toDelete) {
-        await deleteDoc(doc(db, `users/${user.uid}/reports/${d.id}`));
-      }
-
-      const startDate = new Date(Date.UTC(2025, 11, 20)); // 20/12/2025 (UTC)
-      const cyclesToGenerate = 12; // Generate for 1 year
-      
-      let currentStart = new Date(startDate);
-      
-      for (let i = 0; i < cyclesToGenerate; i++) {
-        const currentEnd = new Date(currentStart);
-        currentEnd.setUTCDate(currentStart.getUTCDate() + 29); // 30 days total
-        
-        const cycleName = `${monthNames[currentStart.getUTCMonth()]}/${currentStart.getUTCFullYear()}`;
-        
-        await addDoc(reportsRef, {
-          userId: user.uid,
-          name: cycleName,
-          startDate: Timestamp.fromDate(currentStart),
-          endDate: Timestamp.fromDate(currentEnd),
-          createdAt: serverTimestamp()
-        });
-        
-        currentStart = new Date(currentEnd);
-        currentStart.setUTCDate(currentEnd.getUTCDate() + 1);
-      }
-      
-      setAlertMessage('Ciclos atualizados com sucesso! O registro de 19/01 agora estará no ciclo correto.');
-    } catch (err) {
-      console.error(err);
-      setAlertMessage('Erro ao atualizar ciclos.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const generatePDF = (name: string, startDate: Date, endDate: Date) => {
     const doc = new jsPDF();
@@ -556,11 +491,45 @@ function AppContent() {
     doc.save(`Relatorio_${name.replace(/\s+/g, '_')}.pdf`);
   };
 
-  const handleDownloadCurrentCyclePDF = () => {
+  const generateCSV = (name: string, startDate: Date, endDate: Date) => {
+    const reportTransactions = transactions.filter(t => {
+      const tDate = new Date(t.date);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setUTCHours(23, 59, 59, 999);
+      return tDate >= start && tDate <= end;
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const headers = ['Data', 'Tipo', 'Descrição', 'Valor (R$)'];
+    const rows = reportTransactions.map(t => [
+      t.date.toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
+      getLabel(t.type),
+      t.description.replace(/,/g, ';'), // Avoid CSV issues
+      t.amount.toFixed(2).replace('.', ',')
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Relatorio_${name.replace(/\s+/g, '_')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDownloadCurrentCycle = (format: 'pdf' | 'csv') => {
     const start = new Date(customRange.start + 'T00:00:00Z');
     const end = new Date(customRange.end + 'T23:59:59Z');
     const name = `Relatorio_${customRange.start}_a_${customRange.end}`;
-    generatePDF(name, start, end);
+    if (format === 'pdf') generatePDF(name, start, end);
+    else generateCSV(name, start, end);
   };
 
   const openReportModalWithCurrentCycle = () => {
@@ -569,12 +538,16 @@ function AppContent() {
   };
 
   const handleMonthSelect = (m: number, y: number) => {
-    const start = new Date(y, m, 1);
-    const end = new Date(y, m + 1, 0);
+    const start = new Date(Date.UTC(y, m, 1));
+    const end = new Date(Date.UTC(y, m + 1, 0));
     setCustomRange({
       start: start.toISOString().split('T')[0],
       end: end.toISOString().split('T')[0]
     });
+    
+    // Auto-suggest report name based on month selection
+    const monthNamesShort = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    setReportName(`${monthNamesShort[m]}/${y}`);
   };
 
   const handleAddTransaction = async (e: React.FormEvent) => {
@@ -609,7 +582,7 @@ function AppContent() {
       type: selectedType,
       amount: finalAmount,
       description: finalDescription,
-      date: Timestamp.fromDate(new Date(date))
+      date: Timestamp.fromDate(parseUTCDate(date))
     };
 
     try {
@@ -741,6 +714,23 @@ function AppContent() {
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-black tracking-tighter text-zinc-900">FINANÇAS</h1>
             <div className="flex gap-2">
+              <select 
+                value={selectedYear}
+                onChange={(e) => {
+                  const y = parseInt(e.target.value);
+                  setSelectedYear(y);
+                  if (!activeReportId) {
+                    const start = `${y}-01-01`;
+                    const end = `${y}-12-31`;
+                    setCustomRange({ start, end });
+                  }
+                }}
+                className="px-3 py-2 bg-zinc-100 border border-zinc-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-zinc-900 transition-all outline-none"
+              >
+                {[2024, 2025, 2026, 2027].map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
               <button 
                 onClick={logout}
                 className="p-3 bg-zinc-100 text-zinc-500 rounded-2xl hover:bg-zinc-200 hover:text-zinc-900 transition-all active:scale-95 border border-zinc-200"
@@ -830,10 +820,10 @@ function AppContent() {
                       className="absolute -right-4 -top-4 w-16 h-16 bg-white/20 rounded-full blur-2xl"
                     />
                   )}
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Atual</p>
-                  <p className="text-base font-black leading-tight mb-1">Visão Geral</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Anual</p>
+                  <p className="text-base font-black leading-tight mb-1">Visão Geral {selectedYear}</p>
                   <p className="text-[11px] font-bold opacity-50">
-                    {new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} - {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                    01/01/{selectedYear} - 31/12/{selectedYear}
                   </p>
                 </button>
 
@@ -857,37 +847,40 @@ function AppContent() {
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Ciclo</p>
                     <p className="text-base font-black leading-tight mb-1 truncate">{report.name}</p>
                     <p className="text-[11px] font-bold opacity-40">
-                      {report.startDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} - {report.endDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                      {report.startDate.toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' })} - {report.endDate.toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' })}
                     </p>
                   </button>
                 ))}
-
-                {/* Generate Button Card */}
-                <button
-                  onClick={generateStandardCycles}
-                  className="flex-shrink-0 w-44 p-5 rounded-[24px] border-2 border-dashed border-zinc-200 text-zinc-400 hover:border-indigo-300 hover:text-indigo-600 transition-all text-center flex flex-col items-center justify-center gap-2"
-                >
-                  <PlusCircle className="w-6 h-6" />
-                  <p className="text-[10px] font-bold uppercase tracking-widest">Gerar Ciclos 30 Dias</p>
-                </button>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-8 gap-4">
             <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-bold tracking-tight">
+              <span className="text-4xl font-bold tracking-tight text-zinc-900">
                 R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </span>
             </div>
-            <div className="flex gap-2">
-              <button 
-                onClick={handleDownloadCurrentCyclePDF}
-                className="p-3 bg-zinc-100 text-zinc-900 rounded-2xl hover:bg-zinc-200 transition-all active:scale-95 border border-zinc-200"
-                title="Baixar PDF do Ciclo"
-              >
-                <Download className="w-5 h-5" />
-              </button>
+            <div className="flex flex-wrap gap-2">
+              <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200">
+                <button 
+                  onClick={() => handleDownloadCurrentCycle('pdf')}
+                  className="px-3 py-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-xl transition-all flex items-center gap-2 text-xs font-bold"
+                  title="Baixar PDF"
+                >
+                  <FileText className="w-4 h-4" />
+                  PDF
+                </button>
+                <div className="w-px h-4 bg-zinc-200 self-center mx-1" />
+                <button 
+                  onClick={() => handleDownloadCurrentCycle('csv')}
+                  className="px-3 py-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-xl transition-all flex items-center gap-2 text-xs font-bold"
+                  title="Baixar CSV"
+                >
+                  <Download className="w-4 h-4" />
+                  CSV
+                </button>
+              </div>
               <button 
                 onClick={openReportModalWithCurrentCycle}
                 className="p-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all active:scale-95 shadow-sm shadow-indigo-100"
@@ -1206,9 +1199,35 @@ function AppContent() {
             >
               <div className="flex items-center justify-between mb-8">
                 <h2 className="text-xl font-bold text-zinc-900">Relatórios Salvos</h2>
-                <button onClick={() => setIsHistoryModalOpen(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-colors">
-                  <X className="w-6 h-6 text-zinc-400" />
-                </button>
+                <div className="flex gap-2">
+                  {reports.length > 0 && (
+                    <button 
+                      onClick={() => {
+                        setConfirmModal({
+                          message: 'Deseja excluir TODOS os ciclos salvos? Esta ação não pode ser desfeita.',
+                          onConfirm: async () => {
+                            try {
+                              for (const report of reports) {
+                                await deleteDoc(doc(db, `users/${user.uid}/reports/${report.id}`));
+                              }
+                              setAlertMessage('Todos os ciclos foram excluídos.');
+                            } catch (err) {
+                              handleFirestoreError(err, OperationType.DELETE, `users/${user.uid}/reports`);
+                            }
+                            setConfirmModal(null);
+                          }
+                        });
+                      }}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Limpar Tudo
+                    </button>
+                  )}
+                  <button onClick={() => setIsHistoryModalOpen(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-colors">
+                    <X className="w-6 h-6 text-zinc-400" />
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-4 pr-2">
@@ -1233,15 +1252,26 @@ function AppContent() {
                             {report.startDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} - {report.endDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
                           </p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1">
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
                               generatePDF(report.name, report.startDate, report.endDate);
                             }}
-                            className={`p-2 rounded-xl transition-all ${activeReportId === report.id ? 'bg-zinc-800 text-white hover:bg-zinc-700' : 'bg-zinc-50 text-zinc-400 hover:text-zinc-900'}`}
+                            className={`px-2 py-2 rounded-xl transition-all flex items-center gap-1 text-[10px] font-bold ${activeReportId === report.id ? 'bg-zinc-800 text-white hover:bg-zinc-700' : 'bg-zinc-50 text-zinc-400 hover:text-zinc-900'}`}
                           >
-                            <Download className="w-4 h-4" />
+                            <FileText className="w-3 h-3" />
+                            PDF
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              generateCSV(report.name, report.startDate, report.endDate);
+                            }}
+                            className={`px-2 py-2 rounded-xl transition-all flex items-center gap-1 text-[10px] font-bold ${activeReportId === report.id ? 'bg-zinc-800 text-white hover:bg-zinc-700' : 'bg-zinc-50 text-zinc-400 hover:text-zinc-900'}`}
+                          >
+                            <Download className="w-3 h-3" />
+                            CSV
                           </button>
                           <button 
                             onClick={(e) => {
@@ -1250,7 +1280,7 @@ function AppContent() {
                             }}
                             className={`p-2 rounded-xl transition-all ${activeReportId === report.id ? 'bg-zinc-800 text-white hover:bg-red-500' : 'bg-zinc-50 text-zinc-400 hover:text-red-600'}`}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
@@ -1347,21 +1377,45 @@ function AppContent() {
                   </div>
                 </div>
 
+                <div className="relative py-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-zinc-100"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-2 text-zinc-400 font-bold tracking-widest">Salvar como Ciclo</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Nome do Ciclo</label>
+                  <input 
+                    type="text"
+                    value={reportName}
+                    onChange={(e) => setReportName(e.target.value)}
+                    placeholder="Ex: Jan/2026 ou Semana 1"
+                    className="w-full px-4 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-zinc-900 transition-all"
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <button 
                     onClick={() => setIsCycleModalOpen(false)}
                     className="w-full py-5 bg-zinc-100 text-zinc-900 rounded-2xl font-bold text-lg hover:bg-zinc-200 transition-all active:scale-95"
                   >
-                    Aplicar
+                    Visualizar
                   </button>
                   <button 
-                    onClick={() => {
+                    onClick={async (e) => {
+                      if (!reportName) {
+                        setAlertMessage('Por favor, dê um nome ao ciclo.');
+                        return;
+                      }
+                      await handleAddReport(e as any);
                       setIsCycleModalOpen(false);
-                      openReportModalWithCurrentCycle();
                     }}
-                    className="w-full py-5 bg-zinc-900 text-white rounded-2xl font-bold text-lg hover:bg-zinc-800 transition-all active:scale-95 shadow-xl"
+                    className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-bold text-lg hover:bg-indigo-700 transition-all active:scale-95 shadow-xl shadow-indigo-100"
                   >
-                    Salvar Relatório
+                    Salvar Ciclo
                   </button>
                 </div>
               </div>

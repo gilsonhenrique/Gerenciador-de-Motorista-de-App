@@ -1,5 +1,5 @@
 {
-  "name": "Gerenciador de Motorista",
-  "description": "Painel completo para motoristas de aplicativo acompanharem ganhos da Uber, 99, gastos com combustível, aluguel e relatórios mensais.",
+  "name": "Finanças Driver",
+  "description": "O seu aplicativo de Finanças Driver agora está com um fluxo de trabalho profissional: Visão Geral Anual: Para acompanhar seu desempenho ao longo de todo o ano. Ciclos Manuais: Flexibilidade total para definir seus períodos de fechamento. Exportação PDF/CSV: Facilidade para baixar e analisar seus dados. Layout Responsivo: Tudo organizado e fácil de usar no celular. Datas Precisas: Sem erros de fuso horário nos seus registros.",
   "requestFramePermissions": []
 }
