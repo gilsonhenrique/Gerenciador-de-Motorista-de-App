@@ -51,7 +51,7 @@ service cloud.firestore {
 
     function isValidTransaction(data) {
       return data.userId == request.auth.uid &&
-             data.type in ['uber', '99', 'combustivel', 'gorjeta', 'entrada', 'aluguel'] &&
+             data.type in ['uber', '99', 'combustivel', 'gorjeta', 'entrada', 'aluguel', 'saida'] &&
              data.amount is number && data.amount >= 0 &&
              data.date is timestamp &&
              (!('description' in data) || (data.description is string && data.description.size() < 500)) &&

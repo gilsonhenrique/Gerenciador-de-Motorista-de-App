@@ -63,7 +63,7 @@ import {
 
 interface Transaction {
   id: string;
-  type: 'uber' | '99' | 'combustivel' | 'gorjeta' | 'entrada' | 'aluguel';
+  type: 'uber' | '99' | 'combustivel' | 'gorjeta' | 'entrada' | 'aluguel' | 'saida';
   amount: number;
   date: Date;
   description: string;
@@ -212,6 +212,7 @@ function AppContent() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ message: string, onConfirm: () => void } | null>(null);
+  const [hasAutoSelected, setHasAutoSelected] = useState(false);
 
   // Auth Listener
   useEffect(() => {
@@ -254,10 +255,7 @@ function AppContent() {
     });
 
     // Reports Listener
-    const reportsQuery = query(
-      collection(db, `users/${user.uid}/reports`),
-      orderBy('createdAt', 'desc')
-    );
+    const reportsQuery = collection(db, `users/${user.uid}/reports`);
     const unsubReports = onSnapshot(reportsQuery, (snapshot) => {
       const reportsData = snapshot.docs.map(doc => {
         const data = doc.data();
@@ -310,8 +308,9 @@ function AppContent() {
       '99': 2,
       'gorjeta': 3,
       'entrada': 4,
-      'combustivel': 5,
-      'aluguel': 6
+      'saida': 5,
+      'combustivel': 6,
+      'aluguel': 7
     };
 
     return Object.keys(groups)
@@ -328,15 +327,15 @@ function AppContent() {
       }));
   }, [filteredTransactions]);
 
-  const totalIncome = filteredTransactions
+  const totalIncome = Math.round(filteredTransactions
     .filter(t => ['uber', '99', 'gorjeta', 'entrada'].includes(t.type))
-    .reduce((acc, curr) => acc + curr.amount, 0);
+    .reduce((acc, curr) => acc + curr.amount, 0) * 100) / 100;
   
-  const totalExpenses = filteredTransactions
-    .filter(t => ['combustivel', 'aluguel'].includes(t.type))
-    .reduce((acc, curr) => acc + curr.amount, 0);
+  const totalExpenses = Math.round(filteredTransactions
+    .filter(t => ['combustivel', 'aluguel', 'saida'].includes(t.type))
+    .reduce((acc, curr) => acc + curr.amount, 0) * 100) / 100;
 
-  const balance = totalIncome - totalExpenses;
+  const balance = Math.round((totalIncome - totalExpenses) * 100) / 100;
 
   const months = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -400,27 +399,30 @@ function AppContent() {
     });
   };
 
-  // Auto-select current cycle on load (Optional: keeping it but making sure it doesn't override yearly intent if that's what user wants)
-  // Actually, the user asked for "Visão Geral" to be the year, so we'll keep the auto-select for convenience but the "Visão Geral" card will always go to the year.
+  // Auto-select current cycle on load
   useEffect(() => {
-    if (reports.length > 0 && !activeReportId) {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const todayStr = `${year}-${month}-${day}`;
+    if (reports.length > 0 && !hasAutoSelected) {
+      if (!activeReportId) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
 
-      const currentCycle = reports.find(r => {
-        const startStr = r.startDate.getUTCFullYear() + '-' + String(r.startDate.getUTCMonth() + 1).padStart(2, '0') + '-' + String(r.startDate.getUTCDate()).padStart(2, '0');
-        const endStr = r.endDate.getUTCFullYear() + '-' + String(r.endDate.getUTCMonth() + 1).padStart(2, '0') + '-' + String(r.endDate.getUTCDate()).padStart(2, '0');
-        return todayStr >= startStr && todayStr <= endStr;
-      });
+        const currentCycle = reports.find(r => {
+          if (!r.startDate || !r.endDate) return false;
+          const startStr = r.startDate.getUTCFullYear() + '-' + String(r.startDate.getUTCMonth() + 1).padStart(2, '0') + '-' + String(r.startDate.getUTCDate()).padStart(2, '0');
+          const endStr = r.endDate.getUTCFullYear() + '-' + String(r.endDate.getUTCMonth() + 1).padStart(2, '0') + '-' + String(r.endDate.getUTCDate()).padStart(2, '0');
+          return todayStr >= startStr && todayStr <= endStr;
+        });
 
-      if (currentCycle) {
-        selectReport(currentCycle);
+        if (currentCycle) {
+          selectReport(currentCycle);
+        }
       }
+      setHasAutoSelected(true);
     }
-  }, [reports]);
+  }, [reports, hasAutoSelected, activeReportId]);
 
   const generatePDF = (name: string, startDate: Date, endDate: Date) => {
     const doc = new jsPDF();
@@ -433,15 +435,15 @@ function AppContent() {
       return tDate >= start && tDate <= end;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    const income = reportTransactions
+    const income = Math.round(reportTransactions
       .filter(t => ['uber', '99', 'gorjeta', 'entrada'].includes(t.type))
-      .reduce((acc, curr) => acc + curr.amount, 0);
+      .reduce((acc, curr) => acc + curr.amount, 0) * 100) / 100;
     
-    const expenses = reportTransactions
+    const expenses = Math.round(reportTransactions
       .filter(t => ['combustivel', 'aluguel'].includes(t.type))
-      .reduce((acc, curr) => acc + curr.amount, 0);
+      .reduce((acc, curr) => acc + curr.amount, 0) * 100) / 100;
 
-    const balance = income - expenses;
+    const balance = Math.round((income - expenses) * 100) / 100;
 
     doc.setFontSize(20);
     doc.setTextColor(40);
@@ -472,6 +474,7 @@ function AppContent() {
     doc.text(`Saldo Final: R$ ${balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 18, 75);
 
     const tableData = reportTransactions.map(t => [
+      t.date.toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
       getLabel(t.type),
       t.weekStart && t.weekEnd 
         ? `${t.description} (${t.weekStart.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} - ${t.weekEnd.toLocaleDateString('pt-BR', { timeZone: 'UTC' })})`
@@ -481,7 +484,7 @@ function AppContent() {
 
     autoTable(doc, {
       startY: 85,
-      head: [['Tipo', 'Descrição', 'Valor']],
+      head: [['Data', 'Tipo', 'Descrição', 'Valor']],
       body: tableData,
       headStyles: { fillColor: [40, 40, 40] },
       alternateRowStyles: { fillColor: [250, 250, 250] },
@@ -562,8 +565,9 @@ function AppContent() {
       setAlertMessage('Por favor, insira um valor válido.');
       return;
     }
+    finalAmount = Math.round(finalAmount * 100) / 100;
 
-    let finalDescription = description || selectedType.charAt(0).toUpperCase() + selectedType.slice(1);
+    let finalDescription = description || (selectedType === 'entrada' ? 'Outras Entradas' : selectedType === 'saida' ? 'Outras Saídas' : selectedType.charAt(0).toUpperCase() + selectedType.slice(1));
     
     if (selectedType === 'combustivel') {
       const km = parseFloat(sanitizedAmount) || 0;
@@ -571,9 +575,10 @@ function AppContent() {
       const kml = parseFloat(kmPerLiter) || 1;
       
       finalAmount = (price / kml) * km;
-      finalDescription = `${finalDescription} (KM: ${km})`;
+      finalAmount = Math.round(finalAmount * 100) / 100;
+      finalDescription = `${finalDescription} (KM: ${Math.round(km * 100) / 100})`;
       
-      if (fuelPrice) finalDescription = `${finalDescription} (Preço: R$ ${sanitizedFuelPrice}/L)`;
+      if (fuelPrice) finalDescription = `${finalDescription} (Preço: R$ ${parseFloat(sanitizedFuelPrice).toFixed(2).replace('.', ',')}/L)`;
       finalDescription = `${finalDescription} (Consumo: ${kmPerLiter} Km/L)`;
     }
 
@@ -680,6 +685,7 @@ function AppContent() {
       );
       case 'gorjeta':
       case 'entrada': return <DollarSign className="w-7 h-7 text-emerald-500" />;
+      case 'saida': return <PlusCircle className="w-7 h-7 text-red-500" />;
     }
   };
 
@@ -690,7 +696,8 @@ function AppContent() {
       case 'combustivel': return 'Combustível Diário';
       case 'aluguel': return 'Aluguel Diário';
       case 'gorjeta': return 'Gorjetas';
-      case 'entrada': return 'Outras Entradas';
+      case 'entrada': return 'Entrada';
+      case 'saida': return 'Saída';
     }
   };
 
@@ -815,10 +822,7 @@ function AppContent() {
                   }`}
                 >
                   {!activeReportId && (
-                    <motion.div 
-                      layoutId="active-glow"
-                      className="absolute -right-4 -top-4 w-16 h-16 bg-white/20 rounded-full blur-2xl"
-                    />
+                    <div className="absolute -right-4 -top-4 w-16 h-16 bg-white/20 rounded-full blur-2xl animate-pulse" />
                   )}
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Anual</p>
                   <p className="text-base font-black leading-tight mb-1">Visão Geral {selectedYear}</p>
@@ -839,10 +843,7 @@ function AppContent() {
                     }`}
                   >
                     {activeReportId === report.id && (
-                      <motion.div 
-                        layoutId="active-glow"
-                        className="absolute -right-4 -top-4 w-16 h-16 bg-white/20 rounded-full blur-2xl"
-                      />
+                      <div className="absolute -right-4 -top-4 w-16 h-16 bg-white/20 rounded-full blur-2xl animate-pulse" />
                     )}
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Ciclo</p>
                     <p className="text-base font-black leading-tight mb-1 truncate">{report.name}</p>
@@ -984,8 +985,8 @@ function AppContent() {
                             </div>
                             <div className="flex items-center gap-4">
                               <div className="text-right">
-                                <p className={`font-bold text-lg tracking-tight ${['combustivel', 'aluguel'].includes(t.type) ? 'text-zinc-900' : 'text-emerald-600'}`}>
-                                  {['combustivel', 'aluguel'].includes(t.type) ? '-' : '+'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                <p className={`font-bold text-lg tracking-tight ${['combustivel', 'aluguel', 'saida'].includes(t.type) ? 'text-zinc-900' : 'text-emerald-600'}`}>
+                                  {['combustivel', 'aluguel', 'saida'].includes(t.type) ? '-' : '+'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                 </p>
                               </div>
                               <div className="flex flex-col gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
@@ -1038,7 +1039,11 @@ function AppContent() {
                     {selectedType && getIcon(selectedType)}
                   </div>
                   <h2 className="text-xl font-bold text-zinc-900">
-                    {editingTransactionId ? 'Editar' : 'Novo'} {selectedType && getLabel(selectedType)}
+                    {editingTransactionId ? 'Editar' : 'Novo'} {
+                      (selectedType === 'entrada' || selectedType === 'saida') 
+                      ? 'Lançamento' 
+                      : selectedType && getLabel(selectedType)
+                    }
                   </h2>
                 </div>
                 <button onClick={closeModal} className="p-2 hover:bg-zinc-100 rounded-full transition-colors">
@@ -1062,6 +1067,33 @@ function AppContent() {
                     required
                   />
                 </div>
+
+                {(selectedType === 'entrada' || selectedType === 'saida') && (
+                  <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200">
+                    <button 
+                      type="button"
+                      onClick={() => setSelectedType('entrada')}
+                      className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${
+                        selectedType === 'entrada' 
+                        ? 'bg-emerald-500 text-white shadow-md' 
+                        : 'text-zinc-500 hover:text-zinc-900'
+                      }`}
+                    >
+                      Entrada
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setSelectedType('saida')}
+                      className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${
+                        selectedType === 'saida' 
+                        ? 'bg-red-500 text-white shadow-md' 
+                        : 'text-zinc-500 hover:text-zinc-900'
+                      }`}
+                    >
+                      Saída
+                    </button>
+                  </div>
+                )}
 
                 {selectedType === 'combustivel' && (
                   <div className="grid grid-cols-2 gap-4 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">

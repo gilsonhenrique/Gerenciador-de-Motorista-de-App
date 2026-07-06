@@ -7,7 +7,7 @@
       "properties": {
         "id": { "type": "string" },
         "userId": { "type": "string", "description": "The UID of the user who owns this transaction" },
-        "type": { "type": "string", "enum": ["uber", "99", "combustivel", "gorjeta", "entrada", "aluguel"] },
+        "type": { "type": "string", "enum": ["uber", "99", "combustivel", "gorjeta", "entrada", "aluguel", "saida"] },
         "amount": { "type": "number" },
         "date": { "type": "string", "format": "date-time" },
         "description": { "type": "string" },
