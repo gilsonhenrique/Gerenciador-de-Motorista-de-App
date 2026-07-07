@@ -28,6 +28,8 @@ import {
   RefreshCw,
   LogOut,
   LogIn,
+  Monitor,
+  Smartphone,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
@@ -138,6 +140,42 @@ class ErrorBoundary extends React.Component<any, any> {
 // --- Login Component ---
 
 function Login() {
+  const [error, setError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleLogin = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
+    setError(null);
+    try {
+      await signInWithGoogle();
+    } catch (err: any) {
+      console.error("Login error caught:", err);
+      const errorCode = err?.code || '';
+      const errorMessage = err?.message || '';
+
+      if (errorCode === 'auth/popup-blocked' || errorMessage.includes('popup-blocked') || errorMessage.includes('popup blocked')) {
+        setError('O login popup foi bloqueado pelo seu navegador. Por favor, permita popups/cookies para este site ou utilize o botão abaixo para abrir em uma nova aba.');
+      } else if (errorCode === 'auth/cancelled-popup-request' || errorCode === 'auth/popup-closed-by-user' || errorMessage.includes('cancelled-popup-request')) {
+        setError('A janela de login do Google foi fechada ou cancelada antes da conclusão do login.');
+      } else if (errorMessage.includes('Pending promise was never set')) {
+        setError('Ocorreu um conflito temporário no login do Firebase. Por favor, clique abaixo para abrir em uma nova aba e tentar novamente de forma direta.');
+      } else {
+        setError(`Erro ao autenticar: ${err.message || 'Tente novamente.'}`);
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const openInNewTab = () => {
+    try {
+      window.open(window.location.href, '_blank');
+    } catch (e) {
+      console.error("Failed to open window:", e);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-6">
       <motion.div 
@@ -149,15 +187,59 @@ function Login() {
           <Wallet className="w-10 h-10 text-white" />
         </div>
         <h1 className="text-3xl font-black tracking-tighter text-zinc-900 mb-2">FINANÇAS DRIVER</h1>
-        <p className="text-zinc-500 text-sm mb-10 font-medium">Controle seus ganhos e gastos de forma profissional.</p>
+        <p className="text-zinc-500 text-sm mb-8 font-medium">Controle seus ganhos e gastos de forma profissional.</p>
         
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl text-left">
+            <div className="flex items-start gap-2.5 text-red-700">
+              <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider mb-1">Aviso de Login</p>
+                <p className="text-xs text-red-600 leading-relaxed font-medium">{error}</p>
+              </div>
+            </div>
+            <button
+              onClick={openInNewTab}
+              type="button"
+              className="mt-3 w-full py-2.5 px-4 bg-red-100 hover:bg-red-200 text-red-800 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Monitor className="w-4 h-4" />
+              Abrir em Nova Aba
+            </button>
+          </div>
+        )}
+
         <button 
-          onClick={signInWithGoogle}
-          className="w-full py-4 px-6 bg-white border-2 border-zinc-200 text-zinc-700 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-95 shadow-sm"
+          onClick={handleLogin}
+          disabled={isLoggingIn}
+          type="button"
+          className={`w-full py-4 px-6 bg-white border-2 border-zinc-200 text-zinc-700 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-95 shadow-sm cursor-pointer ${
+            isLoggingIn ? 'opacity-70 cursor-not-allowed' : ''
+          }`}
         >
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-          Entrar com Google
+          {isLoggingIn ? (
+            <>
+              <div className="w-5 h-5 border-2 border-zinc-300 border-t-zinc-700 rounded-full animate-spin" />
+              Entrando...
+            </>
+          ) : (
+            <>
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+              Entrar com Google
+            </>
+          )}
         </button>
+
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <button 
+            onClick={openInNewTab}
+            type="button"
+            className="text-xs font-bold text-zinc-500 hover:text-zinc-900 underline underline-offset-4 flex items-center gap-1.5 cursor-pointer"
+          >
+            <Monitor className="w-3.5 h-3.5" />
+            Está em um iframe? Abra em nova aba
+          </button>
+        </div>
         
         <p className="mt-8 text-[10px] text-zinc-400 uppercase tracking-widest font-bold">
           Seguro & Confiável • Powered by Firebase
@@ -213,6 +295,16 @@ function AppContent() {
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ message: string, onConfirm: () => void } | null>(null);
   const [hasAutoSelected, setHasAutoSelected] = useState(false);
+  const [isDesktopLayout, setIsDesktopLayout] = useState<boolean>(() => {
+    const saved = localStorage.getItem('isDesktopLayout');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  const toggleLayout = () => {
+    const newVal = !isDesktopLayout;
+    setIsDesktopLayout(newVal);
+    localStorage.setItem('isDesktopLayout', JSON.stringify(newVal));
+  };
 
   // Auth Listener
   useEffect(() => {
@@ -314,7 +406,7 @@ function AppContent() {
     };
 
     return Object.keys(groups)
-      .sort((a, b) => b.localeCompare(a))
+      .sort((a, b) => a.localeCompare(b))
       .map(dateKey => ({
         weekKey: dateKey,
         weekLabel: groups[dateKey].label,
@@ -336,6 +428,68 @@ function AppContent() {
     .reduce((acc, curr) => acc + curr.amount, 0) * 100) / 100;
 
   const balance = Math.round((totalIncome - totalExpenses) * 100) / 100;
+
+  const totalUberOnly = useMemo(() => {
+    return Math.round(filteredTransactions
+      .filter(t => t.type === 'uber')
+      .reduce((acc, curr) => acc + curr.amount, 0) * 100) / 100;
+  }, [filteredTransactions]);
+
+  const total99Only = useMemo(() => {
+    return Math.round(filteredTransactions
+      .filter(t => t.type === '99')
+      .reduce((acc, curr) => acc + curr.amount, 0) * 100) / 100;
+  }, [filteredTransactions]);
+
+  const totalCombustivelOnly = useMemo(() => {
+    return Math.round(filteredTransactions
+      .filter(t => t.type === 'combustivel')
+      .reduce((acc, curr) => acc + curr.amount, 0) * 100) / 100;
+  }, [filteredTransactions]);
+
+  const totalRestanteGanhos = useMemo(() => {
+    return Math.round(filteredTransactions
+      .filter(t => ['gorjeta', 'entrada'].includes(t.type))
+      .reduce((acc, curr) => acc + curr.amount, 0) * 100) / 100;
+  }, [filteredTransactions]);
+
+  const totalRestanteGastos = useMemo(() => {
+    return Math.round(filteredTransactions
+      .filter(t => ['aluguel', 'saida'].includes(t.type))
+      .reduce((acc, curr) => acc + curr.amount, 0) * 100) / 100;
+  }, [filteredTransactions]);
+
+  const totalRestanteNet = useMemo(() => {
+    return Math.round((totalRestanteGanhos - totalRestanteGastos) * 100) / 100;
+  }, [totalRestanteGanhos, totalRestanteGastos]);
+
+  const uberGrouped = useMemo(() => {
+    return groupedTransactions.map(group => ({
+      ...group,
+      transactions: group.transactions.filter(t => t.type === 'uber')
+    })).filter(group => group.transactions.length > 0);
+  }, [groupedTransactions]);
+
+  const group99Grouped = useMemo(() => {
+    return groupedTransactions.map(group => ({
+      ...group,
+      transactions: group.transactions.filter(t => t.type === '99')
+    })).filter(group => group.transactions.length > 0);
+  }, [groupedTransactions]);
+
+  const combustivelGrouped = useMemo(() => {
+    return groupedTransactions.map(group => ({
+      ...group,
+      transactions: group.transactions.filter(t => t.type === 'combustivel')
+    })).filter(group => group.transactions.length > 0);
+  }, [groupedTransactions]);
+
+  const restanteGrouped = useMemo(() => {
+    return groupedTransactions.map(group => ({
+      ...group,
+      transactions: group.transactions.filter(t => !['uber', '99', 'combustivel'].includes(t.type))
+    })).filter(group => group.transactions.length > 0);
+  }, [groupedTransactions]);
 
   const months = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -428,19 +582,23 @@ function AppContent() {
     const doc = new jsPDF();
     
     const reportTransactions = transactions.filter(t => {
-      const tDate = new Date(t.date);
+      const tDate = t.date instanceof Date ? t.date : new Date(t.date);
       const start = new Date(startDate);
       const end = new Date(endDate);
       end.setUTCHours(23, 59, 59, 999);
       return tDate >= start && tDate <= end;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }).sort((a, b) => {
+      const timeA = a.date instanceof Date ? a.date.getTime() : new Date(a.date).getTime();
+      const timeB = b.date instanceof Date ? b.date.getTime() : new Date(b.date).getTime();
+      return timeA - timeB;
+    });
 
     const income = Math.round(reportTransactions
       .filter(t => ['uber', '99', 'gorjeta', 'entrada'].includes(t.type))
       .reduce((acc, curr) => acc + curr.amount, 0) * 100) / 100;
     
     const expenses = Math.round(reportTransactions
-      .filter(t => ['combustivel', 'aluguel'].includes(t.type))
+      .filter(t => ['combustivel', 'aluguel', 'saida'].includes(t.type))
       .reduce((acc, curr) => acc + curr.amount, 0) * 100) / 100;
 
     const balance = Math.round((income - expenses) * 100) / 100;
@@ -451,57 +609,226 @@ function AppContent() {
     
     doc.setFontSize(12);
     doc.setTextColor(100);
-    doc.text(`Nome: ${name}`, 14, 32);
-    doc.text(`Período: ${startDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} a ${endDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`, 14, 38);
+    doc.text(`Período: ${startDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} a ${endDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`, 14, 32);
     
     doc.setDrawColor(200);
-    doc.setFillColor(245, 245, 245);
-    doc.rect(14, 45, 182, 30, 'F');
+    doc.setFillColor(245, 247, 250); // Elegant light gray-blue background
+    doc.rect(14, 43, 182, 22, 'F');
     
-    doc.setFontSize(10);
-    doc.setTextColor(80);
-    doc.text('RESUMO DO PERÍODO', 18, 52);
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 110, 120); // Muted slate color for labels
+    doc.setFont('helvetica', 'bold');
+    doc.text('RESUMO DO PERÍODO', 18, 49);
     
-    doc.setFontSize(12);
-    doc.setTextColor(0, 128, 0);
-    doc.text(`Ganhos Totais: R$ ${income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 18, 60);
+    doc.setFontSize(11.5);
+    doc.setTextColor(16, 124, 65); // Dark rich green for total gains
+    doc.text(`Ganhos: R$ ${income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 18, 59);
     
-    doc.setTextColor(200, 0, 0);
-    doc.text(`Gastos Totais: R$ ${expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 18, 67);
+    doc.setTextColor(185, 28, 28); // Vibrant deep red for expenses
+    doc.text(`Gastos: R$ ${expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 80, 59);
     
-    doc.setFontSize(14);
-    doc.setTextColor(40);
-    doc.text(`Saldo Final: R$ ${balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 18, 75);
+    doc.setTextColor(15, 23, 42); // Sophisticated deep slate/black for final balance
+    doc.text(`Saldo Final: R$ ${balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 138, 59);
+    doc.setFont('helvetica', 'normal');
 
-    const tableData = reportTransactions.map(t => [
-      t.date.toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
-      getLabel(t.type),
-      t.weekStart && t.weekEnd 
-        ? `${t.description} (${t.weekStart.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} - ${t.weekEnd.toLocaleDateString('pt-BR', { timeZone: 'UTC' })})`
-        : t.description,
-      `R$ ${t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-    ]);
+    // Grouping logic for ENTRADAS
+    const incomeTypes = ['uber', '99', 'gorjeta', 'entrada'];
+    const incomeRows: any[] = [];
+    let incomeTotal = 0;
 
-    autoTable(doc, {
-      startY: 85,
-      head: [['Data', 'Tipo', 'Descrição', 'Valor']],
-      body: tableData,
-      headStyles: { fillColor: [40, 40, 40] },
-      alternateRowStyles: { fillColor: [250, 250, 250] },
-      margin: { top: 85 },
+    incomeTypes.forEach(type => {
+      const typeTransactions = reportTransactions.filter(t => t.type === type);
+      if (typeTransactions.length === 0) return;
+
+      incomeRows.push([
+        {
+          content: getLabel(type as any).toUpperCase(),
+          colSpan: 4,
+          styles: { fillColor: [240, 243, 246], fontStyle: 'bold', textColor: [30, 41, 59] }
+        }
+      ]);
+
+      let typeSubtotal = 0;
+      typeTransactions.forEach(t => {
+        const desc = t.weekStart && t.weekEnd 
+          ? `${t.description} (${t.weekStart.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} - ${t.weekEnd.toLocaleDateString('pt-BR', { timeZone: 'UTC' })})`
+          : t.description;
+
+        incomeRows.push([
+          t.date.toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
+          getLabel(t.type),
+          desc,
+          `R$ ${t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        ]);
+        typeSubtotal += t.amount;
+      });
+
+      incomeRows.push([
+        {
+          content: `Subtotal ${getLabel(type as any)}`,
+          colSpan: 3,
+          styles: { halign: 'right', fontStyle: 'bold', fillColor: [250, 250, 250] }
+        },
+        {
+          content: `R$ ${typeSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          styles: { fontStyle: 'bold', fillColor: [250, 250, 250] }
+        }
+      ]);
+
+      incomeTotal += typeSubtotal;
     });
+
+    if (incomeRows.length > 0) {
+      incomeRows.push([
+        {
+          content: 'TOTAL DAS ENTRADAS',
+          colSpan: 3,
+          styles: { halign: 'right', fontStyle: 'bold', fillColor: [220, 238, 220], textColor: [0, 100, 0] }
+        },
+        {
+          content: `R$ ${incomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          styles: { fontStyle: 'bold', fillColor: [220, 238, 220], textColor: [0, 100, 0] }
+        }
+      ]);
+    }
+
+    // Grouping logic for SAÍDAS
+    const expenseTypes = ['combustivel', 'aluguel', 'saida'];
+    const expenseRows: any[] = [];
+    let expenseTotal = 0;
+
+    expenseTypes.forEach(type => {
+      const typeTransactions = reportTransactions.filter(t => t.type === type);
+      if (typeTransactions.length === 0) return;
+
+      expenseRows.push([
+        {
+          content: getLabel(type as any).toUpperCase(),
+          colSpan: 4,
+          styles: { fillColor: [246, 240, 240], fontStyle: 'bold', textColor: [59, 30, 30] }
+        }
+      ]);
+
+      let typeSubtotal = 0;
+      typeTransactions.forEach(t => {
+        const desc = t.weekStart && t.weekEnd 
+          ? `${t.description} (${t.weekStart.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} - ${t.weekEnd.toLocaleDateString('pt-BR', { timeZone: 'UTC' })})`
+          : t.description;
+
+        expenseRows.push([
+          t.date.toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
+          getLabel(t.type),
+          desc,
+          `R$ ${t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        ]);
+        typeSubtotal += t.amount;
+      });
+
+      expenseRows.push([
+        {
+          content: `Subtotal ${getLabel(type as any)}`,
+          colSpan: 3,
+          styles: { halign: 'right', fontStyle: 'bold', fillColor: [250, 250, 250] }
+        },
+        {
+          content: `R$ ${typeSubtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          styles: { fontStyle: 'bold', fillColor: [250, 250, 250] }
+        }
+      ]);
+
+      expenseTotal += typeSubtotal;
+    });
+
+    if (expenseRows.length > 0) {
+      expenseRows.push([
+        {
+          content: 'TOTAL DAS SAÍDAS',
+          colSpan: 3,
+          styles: { halign: 'right', fontStyle: 'bold', fillColor: [253, 232, 232], textColor: [150, 0, 0] }
+        },
+        {
+          content: `R$ ${expenseTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          styles: { fontStyle: 'bold', fillColor: [253, 232, 232], textColor: [150, 0, 0] }
+        }
+      ]);
+    }
+
+    let currentY = 73;
+
+    // Render Entradas Table
+    if (incomeRows.length > 0) {
+      doc.setFontSize(14);
+      doc.setTextColor(30, 41, 59); // zinc-800
+      doc.setFont('helvetica', 'bold');
+      doc.text('1. ENTRADAS (RECEITAS)', 14, currentY);
+      currentY += 6;
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Data', 'Tipo', 'Descrição', 'Valor']],
+        body: incomeRows,
+        headStyles: { fillColor: [40, 40, 40] },
+        margin: { left: 14, right: 14 },
+        theme: 'grid',
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 15;
+    } else {
+      doc.setFontSize(12);
+      doc.setTextColor(100);
+      doc.text('Nenhuma entrada registrada no período.', 14, currentY);
+      currentY += 10;
+    }
+
+    // Render Saídas Table
+    if (expenseRows.length > 0) {
+      if (currentY > 230) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.setTextColor(30, 41, 59); // zinc-800
+      doc.setFont('helvetica', 'bold');
+      doc.text('2. SAÍDAS (DESPESAS)', 14, currentY);
+      currentY += 6;
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Data', 'Tipo', 'Descrição', 'Valor']],
+        body: expenseRows,
+        headStyles: { fillColor: [120, 30, 30] }, // Elegant dark red/maroon for expenses
+        margin: { left: 14, right: 14 },
+        theme: 'grid',
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 15;
+    } else {
+      if (currentY > 230) {
+        doc.addPage();
+        currentY = 20;
+      }
+      doc.setFontSize(12);
+      doc.setTextColor(100);
+      doc.text('Nenhuma saída registrada no período.', 14, currentY);
+      currentY += 10;
+    }
 
     doc.save(`Relatorio_${name.replace(/\s+/g, '_')}.pdf`);
   };
 
   const generateCSV = (name: string, startDate: Date, endDate: Date) => {
     const reportTransactions = transactions.filter(t => {
-      const tDate = new Date(t.date);
+      const tDate = t.date instanceof Date ? t.date : new Date(t.date);
       const start = new Date(startDate);
       const end = new Date(endDate);
       end.setUTCHours(23, 59, 59, 999);
       return tDate >= start && tDate <= end;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }).sort((a, b) => {
+      const timeA = a.date instanceof Date ? a.date.getTime() : new Date(a.date).getTime();
+      const timeB = b.date instanceof Date ? b.date.getTime() : new Date(b.date).getTime();
+      return timeA - timeB;
+    });
 
     const headers = ['Data', 'Tipo', 'Descrição', 'Valor (R$)'];
     const rows = reportTransactions.map(t => [
@@ -716,305 +1043,982 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-zinc-50 font-sans text-zinc-900 pb-20">
       {/* Header */}
-      <header className="bg-white border-b border-zinc-200 px-6 py-8">
-        <div className="max-w-md mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-black tracking-tighter text-zinc-900">FINANÇAS</h1>
-            <div className="flex gap-2">
-              <select 
-                value={selectedYear}
-                onChange={(e) => {
-                  const y = parseInt(e.target.value);
-                  setSelectedYear(y);
-                  if (!activeReportId) {
-                    const start = `${y}-01-01`;
-                    const end = `${y}-12-31`;
-                    setCustomRange({ start, end });
-                  }
-                }}
-                className="px-3 py-2 bg-zinc-100 border border-zinc-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-zinc-900 transition-all outline-none"
-              >
-                {[2024, 2025, 2026, 2027].map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-              <button 
-                onClick={logout}
-                className="p-3 bg-zinc-100 text-zinc-500 rounded-2xl hover:bg-zinc-200 hover:text-zinc-900 transition-all active:scale-95 border border-zinc-200"
-                title="Sair"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
+      <header className="bg-white border-b border-zinc-200 px-6 py-6 sticky top-0 z-30 shadow-sm backdrop-blur-md bg-white/95">
+        <div className={`${isDesktopLayout ? 'max-w-[1720px]' : 'max-w-md'} mx-auto flex items-center justify-between gap-4`}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center shadow-md">
+              <Wallet className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-black tracking-tighter text-zinc-900 leading-none">FINANÇAS DRIVER</h1>
+              <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mt-0.5">Painel de Controle</p>
             </div>
           </div>
-
-          {/* Compact Quick Actions */}
-          <div className="w-full overflow-x-auto pb-6 no-scrollbar">
-            <div className="flex gap-2 px-1">
-              <button 
-                onClick={() => openModal('uber')}
-                className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-slate-800 text-white rounded-2xl shadow-sm hover:bg-slate-900 transition-all active:scale-95 border border-slate-700"
-              >
-                <span className="text-xs font-black tracking-tighter leading-none mb-1">Uber</span>
-                <span className="text-[8px] font-bold opacity-60 uppercase">Diário</span>
-              </button>
-              
-              <button 
-                onClick={() => openModal('99')}
-                className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-yellow-400 text-zinc-900 rounded-2xl shadow-sm hover:bg-yellow-500 transition-all active:scale-95 border border-yellow-500"
-              >
-                <span className="text-xs font-black italic tracking-tighter leading-none mb-1">99</span>
-                <span className="text-[8px] font-bold opacity-60 uppercase">Diário</span>
-              </button>
-
-              <button 
-                onClick={() => openModal('combustivel')}
-                className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-indigo-500 text-white rounded-2xl shadow-sm hover:bg-indigo-600 transition-all active:scale-95"
-              >
-                <Fuel className="w-5 h-5 mb-1" />
-                <span className="text-[8px] font-bold opacity-60 uppercase">Combust.</span>
-              </button>
-
-              <button 
-                onClick={() => openModal('gorjeta')}
-                className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-emerald-500 text-white rounded-2xl shadow-sm hover:bg-emerald-600 transition-all active:scale-95"
-              >
-                <DollarSign className="w-5 h-5 mb-1" />
-                <span className="text-[8px] font-bold opacity-60 uppercase">Gorjeta</span>
-              </button>
-
-              <button 
-                onClick={() => openModal('aluguel')}
-                className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-orange-500 text-white rounded-2xl shadow-sm hover:bg-orange-600 transition-all active:scale-95"
-              >
-                <span className="text-xs font-black italic mb-1">M</span>
-                <span className="text-[8px] font-bold opacity-60 uppercase">Aluguel</span>
-              </button>
-
-              <button 
-                onClick={() => openModal('entrada')}
-                className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-white text-zinc-900 rounded-2xl shadow-sm hover:bg-zinc-50 transition-all active:scale-95 border border-zinc-100"
-              >
-                <PlusCircle className="w-5 h-5 mb-1 text-zinc-300" />
-                <span className="text-[8px] font-bold opacity-60 uppercase">Outros</span>
-              </button>
-            </div>
-          </div>
-          
-          <div className="flex flex-col items-center mb-6">
-            <button 
-              onClick={() => setIsCycleModalOpen(true)}
-              className="w-full py-4 px-6 bg-indigo-600 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-200 mb-6"
+          <div className="flex gap-2 items-center">
+            {/* Layout Toggle Button */}
+            <button
+              onClick={toggleLayout}
+              className="p-2.5 bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 hover:text-zinc-900 transition-all active:scale-95 border border-zinc-200 flex items-center gap-1.5 font-bold text-xs shadow-sm cursor-pointer"
+              title={isDesktopLayout ? "Visualizar no celular" : "Visualizar no PC (Tela Cheia)"}
             >
-              <Calendar className="w-5 h-5" />
-              Selecionar Ciclo (Início e Fim)
+              {isDesktopLayout ? <Smartphone className="w-4 h-4 text-zinc-600" /> : <Monitor className="w-4 h-4 text-zinc-600" />}
+              <span className="hidden sm:inline">
+                {isDesktopLayout ? "Modo Celular" : "Modo PC"}
+              </span>
             </button>
 
-            <div className="w-full overflow-x-auto pb-4 no-scrollbar">
-              <div className="flex gap-3 px-1">
-                {/* Default/Current Month Card */}
-                <button
-                  onClick={clearFilter}
-                  className={`flex-shrink-0 w-44 p-5 rounded-[24px] border-2 transition-all text-left relative overflow-hidden group ${
-                    !activeReportId 
-                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100 scale-[1.02]' 
-                      : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200 shadow-sm'
-                  }`}
-                >
-                  {!activeReportId && (
-                    <div className="absolute -right-4 -top-4 w-16 h-16 bg-white/20 rounded-full blur-2xl animate-pulse" />
-                  )}
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Anual</p>
-                  <p className="text-base font-black leading-tight mb-1">Visão Geral {selectedYear}</p>
-                  <p className="text-[11px] font-bold opacity-50">
-                    01/01/{selectedYear} - 31/12/{selectedYear}
-                  </p>
-                </button>
+            <select 
+              value={selectedYear}
+              onChange={(e) => {
+                const y = parseInt(e.target.value);
+                setSelectedYear(y);
+                if (!activeReportId) {
+                  const start = `${y}-01-01`;
+                  const end = `${y}-12-31`;
+                  setCustomRange({ start, end });
+                }
+              }}
+              className="px-3 py-2 bg-zinc-100 border border-zinc-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-zinc-900 transition-all outline-none shadow-sm cursor-pointer"
+            >
+              {[2024, 2025, 2026, 2027].map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
 
-                {/* Saved Reports Carousel */}
-                {reports.map((report) => (
-                  <button
-                    key={report.id}
-                    onClick={() => selectReport(report)}
-                    className={`flex-shrink-0 w-44 p-5 rounded-[24px] border-2 transition-all text-left relative overflow-hidden group ${
-                      activeReportId === report.id 
-                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100 scale-[1.02]' 
-                        : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200 shadow-sm'
-                    }`}
-                  >
-                    {activeReportId === report.id && (
-                      <div className="absolute -right-4 -top-4 w-16 h-16 bg-white/20 rounded-full blur-2xl animate-pulse" />
-                    )}
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Ciclo</p>
-                    <p className="text-base font-black leading-tight mb-1 truncate">{report.name}</p>
-                    <p className="text-[11px] font-bold opacity-40">
-                      {report.startDate.toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' })} - {report.endDate.toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' })}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-8 gap-4">
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-bold tracking-tight text-zinc-900">
-                R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200">
-                <button 
-                  onClick={() => handleDownloadCurrentCycle('pdf')}
-                  className="px-3 py-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-xl transition-all flex items-center gap-2 text-xs font-bold"
-                  title="Baixar PDF"
-                >
-                  <FileText className="w-4 h-4" />
-                  PDF
-                </button>
-                <div className="w-px h-4 bg-zinc-200 self-center mx-1" />
-                <button 
-                  onClick={() => handleDownloadCurrentCycle('csv')}
-                  className="px-3 py-2 text-zinc-500 hover:text-zinc-900 hover:bg-white rounded-xl transition-all flex items-center gap-2 text-xs font-bold"
-                  title="Baixar CSV"
-                >
-                  <Download className="w-4 h-4" />
-                  CSV
-                </button>
-              </div>
-              <button 
-                onClick={openReportModalWithCurrentCycle}
-                className="p-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all active:scale-95 shadow-sm shadow-indigo-100"
-                title="Salvar como Relatório"
-              >
-                <FileText className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => setIsHistoryModalOpen(true)}
-                className="p-3 bg-zinc-100 text-zinc-400 rounded-2xl hover:bg-zinc-200 hover:text-zinc-900 transition-all active:scale-95 border border-zinc-200"
-                title="Histórico de Relatórios"
-              >
-                <History className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4 mt-8">
-            <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 shadow-sm">
-              <div className="flex items-center gap-2 text-emerald-600 mb-1">
-                <TrendingUp className="w-5 h-5" />
-                <span className="text-xs font-bold uppercase tracking-wide">Ganhos</span>
-              </div>
-              <span className="text-xl font-bold text-emerald-700">
-                R$ {totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="bg-red-50 p-4 rounded-2xl border border-red-100 shadow-sm">
-              <div className="flex items-center gap-2 text-red-600 mb-1">
-                <TrendingDown className="w-5 h-5" />
-                <span className="text-xs font-bold uppercase tracking-wide">Gastos</span>
-              </div>
-              <span className="text-xl font-bold text-red-700">
-                R$ {totalExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
+            <button 
+              onClick={logout}
+              className="p-2.5 bg-zinc-100 text-zinc-500 rounded-xl hover:bg-zinc-200 hover:text-red-600 transition-all active:scale-95 border border-zinc-200 shadow-sm cursor-pointer"
+              title="Sair"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-md mx-auto px-6 mt-8">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <div className="w-8 h-8 border-4 border-zinc-200 border-t-zinc-900 rounded-full animate-spin" />
-            <p className="text-sm text-zinc-500 font-medium">Carregando dados...</p>
-          </div>
-        ) : (
-          <>
-            {/* Transactions List */}
-            <section>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Histórico</h2>
-                {customRange && (
-                  <button 
-                    onClick={clearFilter}
-                    className="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1"
-                  >
-                    <X className="w-3 h-3" /> Limpar Filtro
-                  </button>
-                )}
-              </div>
+      {isDesktopLayout ? (
+        /* ==================== MODERN PC FULL-SCREEN DASHBOARD ==================== */
+        <main className="max-w-[1720px] mx-auto px-6 mt-8">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <div className="w-8 h-8 border-4 border-zinc-200 border-t-zinc-900 rounded-full animate-spin" />
+              <p className="text-sm text-zinc-500 font-medium">Carregando dados...</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
-              <div className="space-y-10">
-                {groupedTransactions.length === 0 ? (
-                  <div className="text-center py-12 bg-white rounded-3xl border border-zinc-100 shadow-sm">
-                    <div className="w-12 h-12 bg-zinc-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                      <Calendar className="w-6 h-6 text-zinc-300" />
-                    </div>
-                    <p className="text-zinc-400 text-sm font-medium">Nenhum registro encontrado.</p>
+              {/* LEFT SIDEBAR PANEL: Financial Summaries & Controls */}
+              <div className="lg:col-span-3 space-y-6">
+                
+                {/* Financial Summary Section (Destaque do Saldo & Ganhos/Gastos) */}
+                <div className="bg-white p-6 rounded-[32px] border border-zinc-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-black uppercase tracking-[0.15em] text-zinc-400">Resumo do Período</h3>
+                    <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${
+                      balance >= 0 ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800'
+                    }`}>
+                      {balance >= 0 ? 'Saldo Positivo' : 'Saldo Negativo'}
+                    </span>
                   </div>
-                ) : (
-                  groupedTransactions.map((group) => (
-                    <div key={group.weekKey}>
-                      <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <div className="h-[1px] flex-1 bg-zinc-100" />
-                        {group.weekLabel}
-                        <div className="h-[1px] flex-1 bg-zinc-100" />
-                      </h3>
-                      <div className="space-y-3">
-                        {group.transactions.map((t) => (
-                          <motion.div 
-                            layout
-                            key={t.id}
-                            className="bg-white p-4 rounded-2xl flex items-center justify-between group hover:shadow-md transition-all border border-zinc-100"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="w-14 h-14 bg-zinc-50 rounded-2xl flex items-center justify-center group-hover:bg-zinc-100 transition-colors">
-                                {getIcon(t.type)}
-                              </div>
-                              <div>
-                                <p className="font-bold text-zinc-900 leading-tight mb-0.5">{getLabel(t.type)}</p>
-                                <p className="text-xs text-zinc-400 font-medium">
-                                  {t.weekStart && t.weekEnd 
-                                    ? `${t.weekStart.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} - ${t.weekEnd.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`
-                                    : t.date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
-                                </p>
-                                {t.description && t.description !== getLabel(t.type) && (
-                                  <p className="text-[10px] text-zinc-400 mt-1 italic">{t.description}</p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                <p className={`font-bold text-lg tracking-tight ${['combustivel', 'aluguel', 'saida'].includes(t.type) ? 'text-zinc-900' : 'text-emerald-600'}`}>
-                                  {['combustivel', 'aluguel', 'saida'].includes(t.type) ? '-' : '+'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </p>
-                              </div>
-                              <div className="flex flex-col gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                <button 
-                                  onClick={() => handleEditTransaction(t)}
-                                  className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all active:bg-zinc-100"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </button>
-                                <button 
-                                  onClick={() => handleDeleteTransaction(t.id)}
-                                  className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all active:bg-red-50"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </motion.div>
-                        ))}
+
+                  {/* Saldo do Período Card with Better Highlighting & Dynamic Colors */}
+                  <div className={`p-6 rounded-[24px] border transition-all ${
+                    balance >= 0 
+                      ? 'bg-blue-50 border-blue-200 text-blue-900 shadow-sm shadow-blue-50/50' 
+                      : 'bg-rose-50 border-rose-200 text-rose-900 shadow-sm shadow-rose-50/50'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Wallet className={`w-5 h-5 ${balance >= 0 ? 'text-blue-600' : 'text-rose-600'}`} />
+                      <p className={`text-xs font-bold uppercase tracking-wide ${balance >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>
+                        Saldo Atual do Período
+                      </p>
+                    </div>
+                    <span className={`text-4xl font-black tracking-tight block ${balance >= 0 ? 'text-blue-900' : 'text-rose-900'}`}>
+                      R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  {/* Ganhos vs Gastos Side-by-Side widgets */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-emerald-50 p-5 rounded-[24px] border border-emerald-100 shadow-sm">
+                      <div className="flex items-center gap-2 text-emerald-600 mb-2">
+                        <TrendingUp className="w-5 h-5" />
+                        <span className="text-xs font-bold uppercase tracking-wide">Ganhos</span>
+                      </div>
+                      <span className="text-2xl font-black text-emerald-700 block">
+                        R$ {totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <p className="text-[10px] text-emerald-600 font-bold mt-1 uppercase tracking-wider">
+                        Entradas
+                      </p>
+                    </div>
+                    
+                    <div className="bg-red-50 p-5 rounded-[24px] border border-red-100 shadow-sm">
+                      <div className="flex items-center gap-2 text-red-600 mb-2">
+                        <TrendingDown className="w-5 h-5" />
+                        <span className="text-xs font-bold uppercase tracking-wide">Gastos</span>
+                      </div>
+                      <span className="text-2xl font-black text-red-700 block">
+                        R$ {totalExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <p className="text-[10px] text-red-600 font-bold mt-1 uppercase tracking-wider">
+                        Saídas
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Launch & Report Actions Bento Card */}
+                <div className="bg-white p-6 rounded-[32px] border border-zinc-200 shadow-sm space-y-6">
+                  {/* Modern Quick Launch Grid */}
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-400">Lançamento Rápido</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button 
+                        onClick={() => openModal('uber')}
+                        className="flex flex-col items-center justify-center py-4 bg-slate-800 text-white rounded-2xl shadow-sm hover:bg-slate-900 transition-all active:scale-95 border border-slate-700 cursor-pointer"
+                      >
+                        <Car className="w-5 h-5 mb-1 text-white" />
+                        <span className="text-[11px] font-black tracking-tighter leading-none">Uber</span>
+                      </button>
+                      
+                      <button 
+                        onClick={() => openModal('99')}
+                        className="flex flex-col items-center justify-center py-4 bg-yellow-400 text-zinc-900 rounded-2xl shadow-sm hover:bg-yellow-500 transition-all active:scale-95 border border-yellow-500 cursor-pointer"
+                      >
+                        <Car className="w-5 h-5 mb-1 text-zinc-900" />
+                        <span className="text-[11px] font-black italic tracking-tighter leading-none">99</span>
+                      </button>
+
+                      <button 
+                        onClick={() => openModal('combustivel')}
+                        className="flex flex-col items-center justify-center py-4 bg-indigo-500 text-white rounded-2xl shadow-sm hover:bg-indigo-600 transition-all active:scale-95 cursor-pointer"
+                      >
+                        <Fuel className="w-5 h-5 mb-1" />
+                        <span className="text-[11px] font-bold">Combustível</span>
+                      </button>
+
+                      <button 
+                        onClick={() => openModal('gorjeta')}
+                        className="flex flex-col items-center justify-center py-4 bg-emerald-500 text-white rounded-2xl shadow-sm hover:bg-emerald-600 transition-all active:scale-95 cursor-pointer"
+                      >
+                        <DollarSign className="w-5 h-5 mb-1" />
+                        <span className="text-[11px] font-bold">Gorjeta</span>
+                      </button>
+
+                      <button 
+                        onClick={() => openModal('aluguel')}
+                        className="flex flex-col items-center justify-center py-4 bg-orange-500 text-white rounded-2xl shadow-sm hover:bg-orange-600 transition-all active:scale-95 cursor-pointer"
+                      >
+                        <span className="text-sm font-black italic leading-none mb-1">M</span>
+                        <span className="text-[11px] font-bold">Aluguel</span>
+                      </button>
+
+                      <button 
+                        onClick={() => openModal('saida')}
+                        className="flex flex-col items-center justify-center py-4 bg-white text-zinc-900 rounded-2xl shadow-sm hover:bg-zinc-50 transition-all active:scale-95 border border-zinc-200 cursor-pointer"
+                      >
+                        <PlusCircle className="w-5 h-5 mb-1 text-red-500" />
+                        <span className="text-[11px] font-bold">Outros</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Actions & Exporters */}
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-zinc-100">
+                    <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200 flex-1">
+                      <button 
+                        onClick={() => handleDownloadCurrentCycle('pdf')}
+                        className="flex-1 py-2 text-zinc-600 hover:text-zinc-900 hover:bg-white rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-bold cursor-pointer"
+                        title="Baixar PDF"
+                      >
+                        <FileText className="w-4 h-4" />
+                        PDF
+                      </button>
+                      <div className="w-px h-4 bg-zinc-200 self-center mx-1" />
+                      <button 
+                        onClick={() => handleDownloadCurrentCycle('csv')}
+                        className="flex-1 py-2 text-zinc-600 hover:text-zinc-900 hover:bg-white rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-bold cursor-pointer"
+                        title="Baixar CSV"
+                      >
+                        <Download className="w-4 h-4" />
+                        CSV
+                      </button>
+                    </div>
+                    
+                    <button 
+                      onClick={openReportModalWithCurrentCycle}
+                      className="p-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all active:scale-95 shadow-sm shadow-indigo-100 flex items-center gap-1.5 font-bold text-xs px-4 cursor-pointer"
+                      title="Salvar como Relatório"
+                    >
+                      <Save className="w-4 h-4" />
+                      Salvar
+                    </button>
+                    <button 
+                      onClick={() => setIsHistoryModalOpen(true)}
+                      className="p-3 bg-zinc-100 text-zinc-500 rounded-2xl hover:bg-zinc-200 hover:text-zinc-900 transition-all active:scale-95 border border-zinc-200 cursor-pointer"
+                      title="Histórico de Relatórios"
+                    >
+                      <History className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Saved Cycles Bento Card moved to the bottom of the PC dashboard layout */}
+
+              </div>
+
+              {/* RIGHT SIDE: Active Period Banner & Dynamic Transaction Lists */}
+              <div className="lg:col-span-9 space-y-6">
+                
+                {/* Active Period with integrated Report Cycles Carousel */}
+                <div className="bg-white border border-zinc-200 p-5 rounded-[32px] shadow-sm space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3 text-zinc-900">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center border border-indigo-100/40">
+                        <Calendar className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-indigo-600">Período de Análise Ativo</p>
+                        <p className="text-base font-black text-zinc-900 leading-tight">
+                          {!activeReportId 
+                            ? `Geral de 01/01/${selectedYear} a 31/12/${selectedYear}`
+                            : `Ciclo: ${reports.find(r => r.id === activeReportId)?.name || 'Personalizado'}`
+                          }
+                        </p>
                       </div>
                     </div>
-                  ))
-                )}
+                    
+                    <div className="flex items-center gap-2">
+                      {activeReportId && (
+                        <button 
+                          onClick={clearFilter}
+                          className="text-xs font-bold text-zinc-600 hover:text-zinc-900 bg-zinc-50 hover:bg-zinc-100 py-2.5 px-4 rounded-xl border border-zinc-200 transition-all hover:shadow-sm cursor-pointer flex items-center gap-1.5"
+                        >
+                          Voltar ao Anual
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => setIsCycleModalOpen(true)}
+                        className="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 py-2.5 px-4 rounded-xl transition-all shadow-sm shadow-indigo-100 cursor-pointer flex items-center gap-1.5"
+                      >
+                        <PlusCircle className="w-4 h-4" /> Criar Ciclo
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Carousel row */}
+                  <div className="pt-3.5 border-t border-zinc-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1">
+                        <span>Seus Ciclos de Relatório</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                      </p>
+                      <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider hidden sm:inline">Use Scroll Horizontal ⇄</span>
+                    </div>
+                    
+                    <div className="flex gap-3 overflow-x-auto pb-2 pt-0.5 no-scrollbar scroll-smooth">
+                      {/* Annual */}
+                      <button
+                        onClick={clearFilter}
+                        className={`flex-shrink-0 px-4 py-3 rounded-xl border-2 transition-all text-left flex flex-col justify-between w-[180px] cursor-pointer group ${
+                          !activeReportId 
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-100 scale-[1.01]' 
+                            : 'bg-zinc-50 border-zinc-100 text-zinc-600 hover:bg-white hover:border-indigo-200 hover:shadow-sm'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start w-full">
+                          <span className={`text-[8px] font-black uppercase tracking-wider ${!activeReportId ? 'text-indigo-200' : 'text-zinc-400'}`}>
+                            Visão Geral {selectedYear}
+                          </span>
+                          {!activeReportId && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                        </div>
+                        <div className="mt-1.5 truncate w-full">
+                          <p className={`text-xs font-black truncate leading-tight ${!activeReportId ? 'text-white' : 'text-zinc-800'}`}>
+                            Ano Completo
+                          </p>
+                          <p className={`text-[10px] font-bold mt-0.5 truncate ${!activeReportId ? 'text-indigo-100 opacity-90' : 'text-zinc-400'}`}>
+                            01/01 a 31/12
+                          </p>
+                        </div>
+                      </button>
+
+                      {/* Saved Reports */}
+                      {reports.map((report) => {
+                        const isActive = activeReportId === report.id;
+                        return (
+                          <button
+                            key={report.id}
+                            onClick={() => selectReport(report)}
+                            className={`flex-shrink-0 px-4 py-3 rounded-xl border-2 transition-all text-left flex flex-col justify-between w-[180px] cursor-pointer group ${
+                              isActive 
+                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-100 scale-[1.01]' 
+                                : 'bg-zinc-50 border-zinc-100 text-zinc-600 hover:bg-white hover:border-indigo-200 hover:shadow-sm'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start w-full">
+                              <span className={`text-[8px] font-black uppercase tracking-wider truncate max-w-[120px] ${isActive ? 'text-indigo-200' : 'text-indigo-400'}`}>
+                                Ciclo Gravado
+                              </span>
+                              {isActive && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                            </div>
+                            <div className="mt-1.5 truncate w-full">
+                              <p className={`text-xs font-black truncate leading-tight ${isActive ? 'text-white' : 'text-zinc-800'}`}>
+                                {report.name}
+                              </p>
+                              <p className={`text-[10px] font-bold mt-0.5 truncate ${isActive ? 'text-indigo-100 opacity-90' : 'text-zinc-400'}`}>
+                                {report.startDate.toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' })} a {report.endDate.toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' })}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4 Columns Grid for Transactions */}
+                <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+                  
+                  {/* CARD 1: UBER */}
+                  <div className="bg-white p-5 rounded-[28px] border border-zinc-200 shadow-sm flex flex-col h-[580px]">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 rounded-lg bg-zinc-950 flex items-center justify-center">
+                        <Car className="w-4 h-4 text-white" />
+                      </div>
+                      <h2 className="text-sm font-black text-zinc-800 uppercase tracking-wider">Uber</h2>
+                    </div>
+
+                    {/* Highlighted Total */}
+                    <div className="bg-zinc-900 border border-zinc-800 text-white p-4 rounded-2xl mb-4 flex flex-col justify-between shadow-sm">
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Total Ganhos Uber</span>
+                      <span className="text-xl font-black tracking-tight mt-1">
+                        R$ {totalUberOnly.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    {/* Transaction List */}
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-6 no-scrollbar">
+                      {uberGrouped.length === 0 ? (
+                        <div className="text-center py-16">
+                          <p className="text-zinc-400 text-xs font-medium">Nenhum registro de Uber neste período.</p>
+                        </div>
+                      ) : (
+                        uberGrouped.map((group) => (
+                          <div key={group.weekKey} className="space-y-3">
+                            <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                              <span className="bg-zinc-100 text-zinc-600 py-0.5 px-2 rounded font-bold">{group.weekLabel}</span>
+                              <div className="h-[1px] flex-1 bg-zinc-100" />
+                            </h3>
+                            <div className="space-y-2">
+                              {group.transactions.map((t) => (
+                                <motion.div 
+                                  layout
+                                  key={t.id}
+                                  className="bg-zinc-50/40 p-3 rounded-xl flex items-center justify-between group hover:shadow-sm hover:bg-white transition-all border border-zinc-100"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm border border-zinc-100 shrink-0">
+                                      {getIcon(t.type)}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-zinc-900 leading-none mb-1 truncate text-xs">{getLabel(t.type)}</p>
+                                      {t.description && t.description !== getLabel(t.type) && (
+                                        <p className="text-[9px] text-zinc-500 italic truncate max-w-[120px]" title={t.description}>{t.description}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <div className="text-right">
+                                      <p className="font-black text-xs text-emerald-600">
+                                        + R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </p>
+                                    </div>
+                                    <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button 
+                                        onClick={() => handleEditTransaction(t)}
+                                        className="p-1 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-all cursor-pointer"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </button>
+                                      <button 
+                                        onClick={() => handleDeleteTransaction(t.id)}
+                                        className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* CARD 2: 99 */}
+                  <div className="bg-white p-5 rounded-[28px] border border-zinc-200 shadow-sm flex flex-col h-[580px]">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 rounded-lg bg-yellow-400 flex items-center justify-center">
+                        <Car className="w-4 h-4 text-zinc-900" />
+                      </div>
+                      <h2 className="text-sm font-black text-zinc-800 uppercase tracking-wider">99</h2>
+                    </div>
+
+                    {/* Highlighted Total */}
+                    <div className="bg-yellow-400 border border-yellow-500 text-yellow-950 p-4 rounded-2xl mb-4 flex flex-col justify-between shadow-sm">
+                      <span className="text-[10px] font-bold text-yellow-900 uppercase tracking-widest">Total Ganhos 99</span>
+                      <span className="text-xl font-black tracking-tight mt-1">
+                        R$ {total99Only.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    {/* Transaction List */}
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-6 no-scrollbar">
+                      {group99Grouped.length === 0 ? (
+                        <div className="text-center py-16">
+                          <p className="text-zinc-400 text-xs font-medium">Nenhum registro de 99 neste período.</p>
+                        </div>
+                      ) : (
+                        group99Grouped.map((group) => (
+                          <div key={group.weekKey} className="space-y-3">
+                            <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                              <span className="bg-zinc-100 text-zinc-600 py-0.5 px-2 rounded font-bold">{group.weekLabel}</span>
+                              <div className="h-[1px] flex-1 bg-zinc-100" />
+                            </h3>
+                            <div className="space-y-2">
+                              {group.transactions.map((t) => (
+                                <motion.div 
+                                  layout
+                                  key={t.id}
+                                  className="bg-zinc-50/40 p-3 rounded-xl flex items-center justify-between group hover:shadow-sm hover:bg-white transition-all border border-zinc-100"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm border border-zinc-100 shrink-0">
+                                      {getIcon(t.type)}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-zinc-900 leading-none mb-1 truncate text-xs">{getLabel(t.type)}</p>
+                                      {t.description && t.description !== getLabel(t.type) && (
+                                        <p className="text-[9px] text-zinc-500 italic truncate max-w-[120px]" title={t.description}>{t.description}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <div className="text-right">
+                                      <p className="font-black text-xs text-emerald-600">
+                                        + R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </p>
+                                    </div>
+                                    <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button 
+                                        onClick={() => handleEditTransaction(t)}
+                                        className="p-1 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-all cursor-pointer"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </button>
+                                      <button 
+                                        onClick={() => handleDeleteTransaction(t.id)}
+                                        className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* CARD 3: COMBUSTÍVEL */}
+                  <div className="bg-white p-5 rounded-[28px] border border-zinc-200 shadow-sm flex flex-col h-[580px]">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                        <Fuel className="w-4 h-4 text-red-600" />
+                      </div>
+                      <h2 className="text-sm font-black text-zinc-800 uppercase tracking-wider">Combustível</h2>
+                    </div>
+
+                    {/* Highlighted Total */}
+                    <div className="bg-red-50 border border-red-200 text-red-955 p-4 rounded-2xl mb-4 flex flex-col justify-between shadow-sm">
+                      <span className="text-[10px] font-bold text-red-600 uppercase tracking-widest">Total Combustível</span>
+                      <span className="text-xl font-black tracking-tight mt-1">
+                        R$ {totalCombustivelOnly.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    {/* Transaction List */}
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-6 no-scrollbar">
+                      {combustivelGrouped.length === 0 ? (
+                        <div className="text-center py-16">
+                          <p className="text-zinc-400 text-xs font-medium">Nenhum registro de Combustível neste período.</p>
+                        </div>
+                      ) : (
+                        combustivelGrouped.map((group) => (
+                          <div key={group.weekKey} className="space-y-3">
+                            <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                              <span className="bg-zinc-100 text-zinc-600 py-0.5 px-2 rounded font-bold">{group.weekLabel}</span>
+                              <div className="h-[1px] flex-1 bg-zinc-100" />
+                            </h3>
+                            <div className="space-y-2">
+                              {group.transactions.map((t) => (
+                                <motion.div 
+                                  layout
+                                  key={t.id}
+                                  className="bg-zinc-50/40 p-3 rounded-xl flex items-center justify-between group hover:shadow-sm hover:bg-white transition-all border border-zinc-100"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm border border-zinc-100 shrink-0">
+                                      {getIcon(t.type)}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-zinc-900 leading-none mb-1 truncate text-xs">{getLabel(t.type)}</p>
+                                      {t.description && t.description !== getLabel(t.type) && (
+                                        <p className="text-[9px] text-zinc-500 italic truncate max-w-[120px]" title={t.description}>{t.description}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <div className="text-right">
+                                      <p className="font-black text-xs text-zinc-950">
+                                        - R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </p>
+                                    </div>
+                                    <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button 
+                                        onClick={() => handleEditTransaction(t)}
+                                        className="p-1 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-all cursor-pointer"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </button>
+                                      <button 
+                                        onClick={() => handleDeleteTransaction(t.id)}
+                                        className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* CARD 4: RESTANTE */}
+                  <div className="bg-white p-5 rounded-[28px] border border-zinc-200 shadow-sm flex flex-col h-[580px]">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                        <Wallet className="w-4 h-4 text-indigo-600" />
+                      </div>
+                      <h2 className="text-sm font-black text-zinc-800 uppercase tracking-wider">Restante</h2>
+                    </div>
+
+                    {/* Highlighted Total */}
+                    <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl mb-4 flex flex-col justify-between shadow-sm">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Saldo Restante</span>
+                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                          totalRestanteNet >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {totalRestanteNet >= 0 ? 'Saldo +' : 'Saldo -'}
+                        </span>
+                      </div>
+                      <span className={`text-xl font-black tracking-tight ${totalRestanteNet >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        R$ {totalRestanteNet.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      
+                      <div className="mt-2 pt-2 border-t border-indigo-100/60 flex justify-between items-center gap-2">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-bold text-zinc-400 uppercase">Ganhos</span>
+                          <span className="text-[10px] font-black text-emerald-600">
+                            + R$ {totalRestanteGanhos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="w-px h-5 bg-indigo-100/60" />
+                        <div className="flex flex-col text-right">
+                          <span className="text-[8px] font-bold text-zinc-400 uppercase">Gastos</span>
+                          <span className="text-[10px] font-black text-rose-600">
+                            - R$ {totalRestanteGastos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Transaction List */}
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-6 no-scrollbar">
+                      {restanteGrouped.length === 0 ? (
+                        <div className="text-center py-16">
+                          <p className="text-zinc-400 text-xs font-medium">Nenhum outro registro neste período.</p>
+                        </div>
+                      ) : (
+                        restanteGrouped.map((group) => (
+                          <div key={group.weekKey} className="space-y-3">
+                            <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                              <span className="bg-zinc-100 text-zinc-600 py-0.5 px-2 rounded font-bold">{group.weekLabel}</span>
+                              <div className="h-[1px] flex-1 bg-zinc-100" />
+                            </h3>
+                            <div className="space-y-2">
+                              {group.transactions.map((t) => (
+                                <motion.div 
+                                  layout
+                                  key={t.id}
+                                  className="bg-zinc-50/40 p-3 rounded-xl flex items-center justify-between group hover:shadow-sm hover:bg-white transition-all border border-zinc-100"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm border border-zinc-100 shrink-0">
+                                      {getIcon(t.type)}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-zinc-900 leading-none mb-1 truncate text-xs">{getLabel(t.type)}</p>
+                                      {t.description && t.description !== getLabel(t.type) && (
+                                        <p className="text-[9px] text-zinc-500 italic truncate max-w-[120px]" title={t.description}>{t.description}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <div className="text-right">
+                                      <p className={`font-black text-xs ${['aluguel', 'saida'].includes(t.type) ? 'text-zinc-950' : 'text-emerald-600'}`}>
+                                        {['aluguel', 'saida'].includes(t.type) ? '-' : '+'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </p>
+                                    </div>
+                                    <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button 
+                                        onClick={() => handleEditTransaction(t)}
+                                        className="p-1 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-all cursor-pointer"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </button>
+                                      <button 
+                                        onClick={() => handleDeleteTransaction(t.id)}
+                                        className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
               </div>
-            </section>
-          </>
+
+            </div>
+
+          </div>
         )}
       </main>
+      ) : (
+        /* ==================== PERFECT MOBILE-FIRST MOBILE VIEW ==================== */
+        <>
+          <header className="bg-white border-b border-zinc-200 px-6 pb-8 pt-4">
+            <div className="max-w-md mx-auto">
+              {/* Compact Quick Actions */}
+              <div className="w-full overflow-x-auto pb-6 no-scrollbar">
+                <div className="flex gap-2 px-1">
+                  <button 
+                    onClick={() => openModal('uber')}
+                    className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-slate-800 text-white rounded-2xl shadow-sm hover:bg-slate-900 transition-all active:scale-95 border border-slate-700 cursor-pointer"
+                  >
+                    <span className="text-xs font-black tracking-tighter leading-none mb-1">Uber</span>
+                    <span className="text-[8px] font-bold opacity-60 uppercase">Diário</span>
+                  </button>
+                  
+                  <button 
+                    onClick={() => openModal('99')}
+                    className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-yellow-400 text-zinc-900 rounded-2xl shadow-sm hover:bg-yellow-500 transition-all active:scale-95 border border-yellow-500 cursor-pointer"
+                  >
+                    <span className="text-xs font-black italic tracking-tighter leading-none mb-1">99</span>
+                    <span className="text-[8px] font-bold opacity-60 uppercase">Diário</span>
+                  </button>
+
+                  <button 
+                    onClick={() => openModal('combustivel')}
+                    className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-indigo-500 text-white rounded-2xl shadow-sm hover:bg-indigo-600 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Fuel className="w-5 h-5 mb-1" />
+                    <span className="text-[8px] font-bold opacity-60 uppercase">Combust.</span>
+                  </button>
+
+                  <button 
+                    onClick={() => openModal('gorjeta')}
+                    className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-emerald-500 text-white rounded-2xl shadow-sm hover:bg-emerald-600 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <DollarSign className="w-5 h-5 mb-1" />
+                    <span className="text-[8px] font-bold opacity-60 uppercase">Gorjeta</span>
+                  </button>
+
+                  <button 
+                    onClick={() => openModal('aluguel')}
+                    className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-orange-500 text-white rounded-2xl shadow-sm hover:bg-orange-600 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <span className="text-xs font-black italic mb-1">M</span>
+                    <span className="text-[8px] font-bold opacity-60 uppercase">Aluguel</span>
+                  </button>
+
+                  <button 
+                    onClick={() => openModal('saida')}
+                    className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-white text-zinc-900 rounded-2xl shadow-sm hover:bg-zinc-50 transition-all active:scale-95 border border-zinc-100 cursor-pointer"
+                  >
+                    <PlusCircle className="w-5 h-5 mb-1 text-red-500" />
+                    <span className="text-[8px] font-bold opacity-60 uppercase">Outros</span>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex flex-col items-center mb-6">
+                <button 
+                  onClick={() => setIsCycleModalOpen(true)}
+                  className="w-full py-4 px-6 bg-indigo-600 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-200 mb-6 cursor-pointer"
+                >
+                  <Calendar className="w-5 h-5" />
+                  Selecionar Ciclo (Início e Fim)
+                </button>
+
+                <div className="w-full overflow-x-auto pb-4 no-scrollbar">
+                  <div className="flex gap-3 px-1">
+                    {/* Default/Current Month Card */}
+                    <button
+                      onClick={clearFilter}
+                      className={`flex-shrink-0 w-44 p-5 rounded-[24px] border-2 transition-all text-left relative overflow-hidden group cursor-pointer ${
+                        !activeReportId 
+                          ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100 scale-[1.02]' 
+                          : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200 shadow-sm'
+                      }`}
+                    >
+                      {!activeReportId && (
+                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-white/20 rounded-full blur-2xl animate-pulse" />
+                      )}
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Anual</p>
+                      <p className="text-base font-black leading-tight mb-1">Visão Geral {selectedYear}</p>
+                      <p className="text-[11px] font-bold opacity-50">
+                        01/01/{selectedYear} - 31/12/{selectedYear}
+                      </p>
+                    </button>
+
+                    {/* Saved Reports Carousel */}
+                    {reports.map((report) => (
+                      <button
+                        key={report.id}
+                        onClick={() => selectReport(report)}
+                        className={`flex-shrink-0 w-44 p-5 rounded-[24px] border-2 transition-all text-left relative overflow-hidden group cursor-pointer ${
+                          activeReportId === report.id 
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100 scale-[1.02]' 
+                            : 'bg-white border-zinc-100 text-zinc-500 hover:border-zinc-200 shadow-sm'
+                        }`}
+                      >
+                        {activeReportId === report.id && (
+                          <div className="absolute -right-4 -top-4 w-16 h-16 bg-white/20 rounded-full blur-2xl animate-pulse" />
+                        )}
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Ciclo</p>
+                        <p className="text-base font-black leading-tight mb-1 truncate">{report.name}</p>
+                        <p className="text-[11px] font-bold opacity-40">
+                          {report.startDate.toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' })} - {report.endDate.toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' })}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Resumo Financeiro Mobile (Destaque do Saldo & Ganhos/Gastos) */}
+              <div className="mt-8 space-y-4">
+                {/* Saldo do Período - Highlighting Blue if Positive, Red/Rose if Negative */}
+                <div className={`p-5 rounded-3xl border transition-all ${
+                  balance >= 0 
+                    ? 'bg-blue-50 border-blue-200 text-blue-900 shadow-sm shadow-blue-50/50' 
+                    : 'bg-rose-50 border-rose-200 text-rose-900 shadow-sm shadow-rose-50/50'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Wallet className={`w-4 h-4 ${balance >= 0 ? 'text-blue-600' : 'text-rose-600'}`} />
+                      <span className={`text-[10px] font-black uppercase tracking-wider ${balance >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>
+                        Saldo do Período
+                      </span>
+                    </div>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                      balance >= 0 ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800'
+                    }`}>
+                      {balance >= 0 ? 'Positivo' : 'Negativo'}
+                    </span>
+                  </div>
+                  <span className={`text-3xl font-black tracking-tight block ${balance >= 0 ? 'text-blue-900' : 'text-rose-900'}`}>
+                    R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                {/* Ganhos vs Gastos Side-by-Side Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 shadow-sm">
+                    <div className="flex items-center gap-1.5 text-emerald-600 mb-1">
+                      <TrendingUp className="w-4 h-4" />
+                      <span className="text-[10px] font-bold uppercase tracking-wide">Ganhos</span>
+                    </div>
+                    <span className="text-xl font-bold text-emerald-700 block">
+                      R$ {totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  
+                  <div className="bg-red-50 p-4 rounded-2xl border border-red-100 shadow-sm">
+                    <div className="flex items-center gap-1.5 text-red-600 mb-1">
+                      <TrendingDown className="w-4 h-4" />
+                      <span className="text-[10px] font-bold uppercase tracking-wide">Gastos</span>
+                    </div>
+                    <span className="text-xl font-bold text-red-700 block">
+                      R$ {totalExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Export / Report Actions Bar */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200 flex-1 shadow-sm">
+                    <button 
+                      onClick={() => handleDownloadCurrentCycle('pdf')}
+                      className="flex-1 py-2 px-2 text-zinc-600 hover:text-zinc-900 hover:bg-white rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs font-bold cursor-pointer"
+                      title="Baixar PDF"
+                    >
+                      <FileText className="w-4 h-4" />
+                      PDF
+                    </button>
+                    <div className="w-px h-4 bg-zinc-200 self-center mx-1" />
+                    <button 
+                      onClick={() => handleDownloadCurrentCycle('csv')}
+                      className="flex-1 py-2 px-2 text-zinc-600 hover:text-zinc-900 hover:bg-white rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs font-bold cursor-pointer"
+                      title="Baixar CSV"
+                    >
+                      <Download className="w-4 h-4" />
+                      CSV
+                    </button>
+                  </div>
+                  <button 
+                    onClick={openReportModalWithCurrentCycle}
+                    className="p-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all active:scale-95 shadow-md shadow-indigo-100 cursor-pointer"
+                    title="Salvar como Relatório"
+                  >
+                    <Save className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => setIsHistoryModalOpen(true)}
+                    className="p-3 bg-zinc-100 text-zinc-500 rounded-2xl hover:bg-zinc-200 hover:text-zinc-900 transition-all active:scale-95 border border-zinc-200 shadow-sm cursor-pointer"
+                    title="Histórico de Relatórios"
+                  >
+                    <History className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-md mx-auto px-6 mt-8">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <div className="w-8 h-8 border-4 border-zinc-200 border-t-zinc-900 rounded-full animate-spin" />
+                <p className="text-sm text-zinc-500 font-medium">Carregando dados...</p>
+              </div>
+            ) : (
+              <section>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Histórico</h2>
+                  {customRange && (
+                    <button 
+                      onClick={clearFilter}
+                      className="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" /> Limpar Filtro
+                    </button>
+                  )}
+                </div>
+                
+                <div className="space-y-10">
+                  {groupedTransactions.length === 0 ? (
+                    <div className="text-center py-12 bg-white rounded-3xl border border-zinc-100 shadow-sm">
+                      <div className="w-12 h-12 bg-zinc-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <Calendar className="w-6 h-6 text-zinc-300" />
+                      </div>
+                      <p className="text-zinc-400 text-sm font-medium">Nenhum registro encontrado.</p>
+                    </div>
+                  ) : (
+                    groupedTransactions.map((group) => (
+                      <div key={group.weekKey}>
+                        <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                          <div className="h-[1px] flex-1 bg-zinc-100" />
+                          {group.weekLabel}
+                          <div className="h-[1px] flex-1 bg-zinc-100" />
+                        </h3>
+                        <div className="space-y-3">
+                          {group.transactions.map((t) => (
+                            <motion.div 
+                              layout
+                              key={t.id}
+                              className="bg-white p-4 rounded-2xl flex items-center justify-between group hover:shadow-md transition-all border border-zinc-100"
+                            >
+                              <div className="flex items-center gap-4 min-w-0">
+                                <div className="w-14 h-14 bg-zinc-50 rounded-2xl flex items-center justify-center group-hover:bg-zinc-100 transition-colors shrink-0">
+                                  {getIcon(t.type)}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-bold text-zinc-900 leading-tight mb-0.5 truncate">{getLabel(t.type)}</p>
+                                  <p className="text-xs text-zinc-400 font-medium">
+                                    {t.weekStart && t.weekEnd 
+                                      ? `${t.weekStart.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} - ${t.weekEnd.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`
+                                      : t.date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                                  </p>
+                                  {t.description && t.description !== getLabel(t.type) && (
+                                    <p className="text-[10px] text-zinc-400 mt-1 italic truncate">{t.description}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-4 shrink-0">
+                                <div className="text-right">
+                                  <p className={`font-bold text-lg tracking-tight ${['combustivel', 'aluguel', 'saida'].includes(t.type) ? 'text-zinc-900' : 'text-emerald-600'}`}>
+                                    {['combustivel', 'aluguel', 'saida'].includes(t.type) ? '-' : '+'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </p>
+                                </div>
+                                <div className="flex flex-col gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                  <button 
+                                    onClick={() => handleEditTransaction(t)}
+                                    className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all active:bg-zinc-100 cursor-pointer"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteTransaction(t.id)}
+                                    className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all active:bg-red-50 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+            )}
+          </main>
+        </>
+      )}
 
       {/* Modals */}
       <AnimatePresence>
