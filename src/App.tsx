@@ -1416,39 +1416,52 @@ function AppContent() {
                                 <motion.div 
                                   layout
                                   key={t.id}
-                                  className="bg-zinc-50/40 p-3 rounded-xl flex items-center justify-between group hover:shadow-sm hover:bg-white transition-all border border-zinc-100"
+                                  className="bg-zinc-50/40 p-2.5 rounded-xl flex flex-col gap-1.5 group hover:shadow-sm hover:bg-white transition-all border border-zinc-100"
                                 >
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm border border-zinc-100 shrink-0">
-                                      {getIcon(t.type)}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="font-bold text-zinc-900 leading-none mb-1 truncate text-xs">{getLabel(t.type)}</p>
-                                      {t.description && t.description !== getLabel(t.type) && (
-                                        <p className="text-[9px] text-zinc-500 italic truncate max-w-[120px]" title={t.description}>{t.description}</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    <div className="text-right">
-                                      <p className="font-black text-xs text-emerald-600">
-                                        + R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  <div className="flex items-center justify-between gap-2 w-full">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div className="w-6 h-6 bg-white rounded-md flex items-center justify-center shadow-sm border border-zinc-100 shrink-0">
+                                        {getIcon(t.type)}
+                                      </div>
+                                      <p className="font-bold text-zinc-900 truncate text-[11px] leading-tight" title={getLabel(t.type)}>
+                                        {getLabel(t.type)}
                                       </p>
                                     </div>
-                                    <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button 
-                                        onClick={() => handleEditTransaction(t)}
-                                        className="p-1 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-all cursor-pointer"
-                                      >
-                                        <Pencil className="w-3 h-3" />
-                                      </button>
-                                      <button 
-                                        onClick={() => handleDeleteTransaction(t.id)}
-                                        className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
+                                    
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <p className="font-black text-[11px] leading-tight text-emerald-600">
+                                        + R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </p>
+                                      <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                          onClick={() => handleEditTransaction(t)}
+                                          className="p-0.5 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-all cursor-pointer"
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleDeleteTransaction(t.id)}
+                                          className="p-0.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
                                     </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between gap-2 pl-8 text-[9px]">
+                                    <div className="min-w-0 flex-1">
+                                      {t.description && t.description !== getLabel(t.type) ? (
+                                        <p className="text-zinc-500 italic break-words line-clamp-2 leading-snug" title={t.description}>
+                                          {t.description}
+                                        </p>
+                                      ) : (
+                                        <p className="text-zinc-400/50 font-medium">Sem descrição</p>
+                                      )}
+                                    </div>
+                                    <span className="text-zinc-400 font-bold shrink-0">
+                                      {t.date.toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' })}
+                                    </span>
                                   </div>
                                 </motion.div>
                               ))}
@@ -1494,39 +1507,52 @@ function AppContent() {
                                 <motion.div 
                                   layout
                                   key={t.id}
-                                  className="bg-zinc-50/40 p-3 rounded-xl flex items-center justify-between group hover:shadow-sm hover:bg-white transition-all border border-zinc-100"
+                                  className="bg-zinc-50/40 p-2.5 rounded-xl flex flex-col gap-1.5 group hover:shadow-sm hover:bg-white transition-all border border-zinc-100"
                                 >
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm border border-zinc-100 shrink-0">
-                                      {getIcon(t.type)}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="font-bold text-zinc-900 leading-none mb-1 truncate text-xs">{getLabel(t.type)}</p>
-                                      {t.description && t.description !== getLabel(t.type) && (
-                                        <p className="text-[9px] text-zinc-500 italic truncate max-w-[120px]" title={t.description}>{t.description}</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    <div className="text-right">
-                                      <p className="font-black text-xs text-emerald-600">
-                                        + R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  <div className="flex items-center justify-between gap-2 w-full">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div className="w-6 h-6 bg-white rounded-md flex items-center justify-center shadow-sm border border-zinc-100 shrink-0">
+                                        {getIcon(t.type)}
+                                      </div>
+                                      <p className="font-bold text-zinc-900 truncate text-[11px] leading-tight" title={getLabel(t.type)}>
+                                        {getLabel(t.type)}
                                       </p>
                                     </div>
-                                    <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button 
-                                        onClick={() => handleEditTransaction(t)}
-                                        className="p-1 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-all cursor-pointer"
-                                      >
-                                        <Pencil className="w-3 h-3" />
-                                      </button>
-                                      <button 
-                                        onClick={() => handleDeleteTransaction(t.id)}
-                                        className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
+                                    
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <p className="font-black text-[11px] leading-tight text-emerald-600">
+                                        + R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </p>
+                                      <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                          onClick={() => handleEditTransaction(t)}
+                                          className="p-0.5 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-all cursor-pointer"
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleDeleteTransaction(t.id)}
+                                          className="p-0.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
                                     </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between gap-2 pl-8 text-[9px]">
+                                    <div className="min-w-0 flex-1">
+                                      {t.description && t.description !== getLabel(t.type) ? (
+                                        <p className="text-zinc-500 italic break-words line-clamp-2 leading-snug" title={t.description}>
+                                          {t.description}
+                                        </p>
+                                      ) : (
+                                        <p className="text-zinc-400/50 font-medium">Sem descrição</p>
+                                      )}
+                                    </div>
+                                    <span className="text-zinc-400 font-bold shrink-0">
+                                      {t.date.toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' })}
+                                    </span>
                                   </div>
                                 </motion.div>
                               ))}
@@ -1572,39 +1598,52 @@ function AppContent() {
                                 <motion.div 
                                   layout
                                   key={t.id}
-                                  className="bg-zinc-50/40 p-3 rounded-xl flex items-center justify-between group hover:shadow-sm hover:bg-white transition-all border border-zinc-100"
+                                  className="bg-zinc-50/40 p-2.5 rounded-xl flex flex-col gap-1.5 group hover:shadow-sm hover:bg-white transition-all border border-zinc-100"
                                 >
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm border border-zinc-100 shrink-0">
-                                      {getIcon(t.type)}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="font-bold text-zinc-900 leading-none mb-1 truncate text-xs">{getLabel(t.type)}</p>
-                                      {t.description && t.description !== getLabel(t.type) && (
-                                        <p className="text-[9px] text-zinc-500 italic truncate max-w-[120px]" title={t.description}>{t.description}</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    <div className="text-right">
-                                      <p className="font-black text-xs text-zinc-950">
-                                        - R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  <div className="flex items-center justify-between gap-2 w-full">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div className="w-6 h-6 bg-white rounded-md flex items-center justify-center shadow-sm border border-zinc-100 shrink-0">
+                                        {getIcon(t.type)}
+                                      </div>
+                                      <p className="font-bold text-zinc-900 truncate text-[11px] leading-tight" title={getLabel(t.type)}>
+                                        {getLabel(t.type)}
                                       </p>
                                     </div>
-                                    <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button 
-                                        onClick={() => handleEditTransaction(t)}
-                                        className="p-1 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-all cursor-pointer"
-                                      >
-                                        <Pencil className="w-3 h-3" />
-                                      </button>
-                                      <button 
-                                        onClick={() => handleDeleteTransaction(t.id)}
-                                        className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
+                                    
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <p className="font-black text-[11px] leading-tight text-zinc-950">
+                                        - R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </p>
+                                      <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                          onClick={() => handleEditTransaction(t)}
+                                          className="p-0.5 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-all cursor-pointer"
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleDeleteTransaction(t.id)}
+                                          className="p-0.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
                                     </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between gap-2 pl-8 text-[9px]">
+                                    <div className="min-w-0 flex-1">
+                                      {t.description && t.description !== getLabel(t.type) ? (
+                                        <p className="text-zinc-500 italic break-words line-clamp-2 leading-snug" title={t.description}>
+                                          {t.description}
+                                        </p>
+                                      ) : (
+                                        <p className="text-zinc-400/50 font-medium">Sem descrição</p>
+                                      )}
+                                    </div>
+                                    <span className="text-zinc-400 font-bold shrink-0">
+                                      {t.date.toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' })}
+                                    </span>
                                   </div>
                                 </motion.div>
                               ))}
@@ -1673,39 +1712,52 @@ function AppContent() {
                                 <motion.div 
                                   layout
                                   key={t.id}
-                                  className="bg-zinc-50/40 p-3 rounded-xl flex items-center justify-between group hover:shadow-sm hover:bg-white transition-all border border-zinc-100"
+                                  className="bg-zinc-50/40 p-2.5 rounded-xl flex flex-col gap-1.5 group hover:shadow-sm hover:bg-white transition-all border border-zinc-100"
                                 >
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm border border-zinc-100 shrink-0">
-                                      {getIcon(t.type)}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="font-bold text-zinc-900 leading-none mb-1 truncate text-xs">{getLabel(t.type)}</p>
-                                      {t.description && t.description !== getLabel(t.type) && (
-                                        <p className="text-[9px] text-zinc-500 italic truncate max-w-[120px]" title={t.description}>{t.description}</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    <div className="text-right">
-                                      <p className={`font-black text-xs ${['aluguel', 'saida'].includes(t.type) ? 'text-zinc-950' : 'text-emerald-600'}`}>
-                                        {['aluguel', 'saida'].includes(t.type) ? '-' : '+'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  <div className="flex items-center justify-between gap-2 w-full">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div className="w-6 h-6 bg-white rounded-md flex items-center justify-center shadow-sm border border-zinc-100 shrink-0">
+                                        {getIcon(t.type)}
+                                      </div>
+                                      <p className="font-bold text-zinc-900 truncate text-[11px] leading-tight" title={getLabel(t.type)}>
+                                        {getLabel(t.type)}
                                       </p>
                                     </div>
-                                    <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button 
-                                        onClick={() => handleEditTransaction(t)}
-                                        className="p-1 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-all cursor-pointer"
-                                      >
-                                        <Pencil className="w-3 h-3" />
-                                      </button>
-                                      <button 
-                                        onClick={() => handleDeleteTransaction(t.id)}
-                                        className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </button>
+                                    
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <p className={`font-black text-[11px] leading-tight ${['aluguel', 'saida'].includes(t.type) ? 'text-zinc-950' : 'text-emerald-600'}`}>
+                                        {['aluguel', 'saida'].includes(t.type) ? '-' : '+'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                      </p>
+                                      <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                          onClick={() => handleEditTransaction(t)}
+                                          className="p-0.5 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-all cursor-pointer"
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleDeleteTransaction(t.id)}
+                                          className="p-0.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-all cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
                                     </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between gap-2 pl-8 text-[9px]">
+                                    <div className="min-w-0 flex-1">
+                                      {t.description && t.description !== getLabel(t.type) ? (
+                                        <p className="text-zinc-500 italic break-words line-clamp-2 leading-snug" title={t.description}>
+                                          {t.description}
+                                        </p>
+                                      ) : (
+                                        <p className="text-zinc-400/50 font-medium">Sem descrição</p>
+                                      )}
+                                    </div>
+                                    <span className="text-zinc-400 font-bold shrink-0">
+                                      {t.date.toLocaleDateString('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' })}
+                                    </span>
                                   </div>
                                 </motion.div>
                               ))}
@@ -2023,7 +2075,7 @@ function AppContent() {
       {/* Modals */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
+          <div key="transaction-modal-container" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -2163,7 +2215,7 @@ function AppContent() {
         )}
 
         {isReportModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
+          <div key="report-modal-container" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -2219,7 +2271,7 @@ function AppContent() {
         )}
 
         {isHistoryModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
+          <div key="history-modal-container" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -2329,7 +2381,7 @@ function AppContent() {
         )}
 
         {isCycleModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
+          <div key="cycle-modal-container" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -2460,7 +2512,7 @@ function AppContent() {
         )}
 
         {alertMessage && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div key="alert-modal-container" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm" onClick={() => setAlertMessage(null)} />
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-xs bg-white rounded-3xl p-6 shadow-2xl text-center">
               <div className="w-12 h-12 bg-zinc-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -2473,7 +2525,7 @@ function AppContent() {
         )}
 
         {confirmModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div key="confirm-modal-container" className="fixed inset-0 z-[100] flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm" onClick={() => setConfirmModal(null)} />
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-xs bg-white rounded-3xl p-6 shadow-2xl text-center">
               <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
